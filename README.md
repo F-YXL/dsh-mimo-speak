@@ -1,18 +1,18 @@
-# dsh-mimo-speak — MiMo TTS 语音合成插件（DeepSeek Harness 0.2.0-rc.2）
+# dsh-mimo-speak — MiMo TTS 语音合成插件（DeepSeek Harness 0.2.2-rc.1）
 
 把助手回复"读出来"的 DSH 插件：**"插件"页里的配置卡片** + **每条已定稿助手回复动作行里的音量按钮** + **带可拖动进度条的内联播放器** + **设置页里的"语音历史"**。语音由小米 MiMo TTS（`mimo-v2.5-tts`）合成，API Key 只存在于宿主侧，浏览器只发送文本、收到 WAV。
 
-面向 **deepseek-harness `0.2.0-rc.2`**（`engines.dsh: ">=0.2.0-rc.2 <0.3.0"`），完全按照官方插件规范实现：
+面向 **deepseek-harness `0.2.2-rc.1`**（`engines.dsh: ">=0.2.2-rc.1 <0.3.0"`），完全按照官方插件规范实现：
 
 | 官方规范条目 | 本插件的落点 |
 |---|---|
-| [打包与安装插件](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.0-rc.2/docs/user/develop/basic/publish.zh.md)（bundle 组合包） | `package.json` 声明 `dsh.bundle.patch` + `cordis.patch.yml` 插入 `id: mimo-speak` 行；同包携带 `dsh.client` 浏览器半侧（裸包名行同时挂载 Host/Client 两侧） |
-| [插件配置](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.0-rc.2/docs/user/develop/basic/config.zh.md)（无硬编码可调参数） | 全部参数走 Schemastery Config + `.volatile()`（接口地址/模型/音色/克隆样本/风格/字数/超时均可配）；密钥 `role('secret')` |
-| [即时配置表单](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.0-rc.2/docs/cookbook/adding-a-settings-card.zh.md) | `ctx.configForms`（`mimo-speak` 命名空间）+ `SettingsFormModel` 标准表单；`ctx.settings.configure({ auto: false })` 关闭自动页策略，配置卡片自己注册进官方 `plugins.bundle.config`（key = npm 包名） |
-| [Web Client Slots](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.0-rc.2/docs/subsystems/slots.zh.md) | `plugins.bundle.config`（插件页配置卡）+ `conversation.chat.assistant-actions`（消息动作行）+ `settings.section`（语音历史页）三个席位，`ctx.slots.inject` 贡献、effect 生命周期托管；跨插件只 `import type` 取 slot 声明 |
-| [Web Server 子系统](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.0-rc.2/docs/subsystems/web-server.zh.md) | `ctx.webServer.register` 挂 `/api/mimo-speak/status`、`/api/mimo-speak/synthesize` 两条路由，入口先过 `ctx.connection.requestRejection` 信任栅栏（Host/Origin + 浏览器鉴权），LAN 裸请求无法白嫖 API 额度 |
-| [客户端模块系统](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.0-rc.2/packages/client/modules/README.zh.md) | `lib/client.js` 为 lazy-CJS factory（`window.__ModuleLoader__.load({ id, factory })`），外部仅平台模块（react / cordis / client-store / ui-primitives），跨插件只经 Cordis 服务与 `import type`（构建期 purity gate 强制） |
-| [extension-cookbook · UI 插件](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.0-rc.2/docs/cookbook/extension-cookbook.zh.md) | 业务数据不进组件 props 面：文本经 `useChat` 从 Conversation binding 派生，配置经 `configForms`，合成经宿主路由，文案经 `ctx.locale`（zh/en 双语） |
+| [打包与安装插件](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/user/develop/basic/publish.zh.md)（bundle 组合包） | `package.json` 声明 `dsh.bundle.patch` + `cordis.patch.yml` 插入 `id: mimo-speak` 行；同包携带 `dsh.client` 浏览器半侧（裸包名行同时挂载 Host/Client 两侧） |
+| [插件配置](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/user/develop/basic/config.zh.md)（无硬编码可调参数） | 全部参数走 Schemastery Config + `.volatile()`（接口地址/模型/音色/克隆样本/风格/字数/超时均可配）；密钥 `role('secret')` |
+| [即时配置表单](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/cookbook/adding-a-settings-card.zh.md) | `ctx.configForms`（`mimo-speak` 命名空间）+ `SettingsFormModel` 标准表单；`ctx.settings.configure({ auto: false })` 关闭自动页策略，配置卡片自己注册进官方 `plugins.bundle.config`（key = npm 包名） |
+| [Web Client Slots](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/subsystems/slots.zh.md) | `plugins.bundle.config`（插件页配置卡）+ `conversation.chat.assistant-actions`（消息动作行）+ `settings.section`（语音历史页）三个席位，`ctx.slots.inject` 贡献、effect 生命周期托管；跨插件只 `import type` 取 slot 声明 |
+| [Web Server 子系统](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/subsystems/web-server.zh.md) | `ctx.webServer.register` 挂 `/api/mimo-speak/status`、`/api/mimo-speak/synthesize` 两条路由，入口先过 `ctx.connection.requestRejection` 信任栅栏（Host/Origin + 浏览器鉴权），LAN 裸请求无法白嫖 API 额度 |
+| [客户端模块系统](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/modules/README.zh.md) | `lib/client.js` 为 lazy-CJS factory（`window.__ModuleLoader__.load({ id, factory })`），外部仅平台模块（react / cordis / client-store / ui-primitives），跨插件只经 Cordis 服务与 `import type`（构建期 purity gate 强制） |
+| [extension-cookbook · UI 插件](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/cookbook/extension-cookbook.zh.md) | 业务数据不进组件 props 面：文本经 `useChat` 从 Conversation binding 派生，配置经 `configForms`，合成经宿主路由，文案经 `ctx.locale`（zh/en 双语） |
 
 ## 功能
 
@@ -46,8 +46,8 @@
 语音指令的识别交给官方组合包，本插件只负责播报，两者互补：
 
 ```bash
-# 版本要与宿主对齐：DSH 0.2.2-rc.1 → 用 @next 标签
-dsh plugin --profile desktop add @deepseek-ai/dsh-experimental-voice-input-bundle@next
+# 版本要与宿主对齐：DSH 0.2.2-rc.1 → 钉到同版本（@next 会随宿主前进，装出跨版本 bundle）
+dsh plugin --profile desktop add @deepseek-ai/dsh-experimental-voice-input-bundle@0.2.2-rc.1
 ```
 
 它是本地 SenseVoice 转写（首次使用下载运行时），识别结果插入输入框草稿，不会自动发送。
@@ -112,18 +112,18 @@ dsh --profile demo
 
 ## 适配版本与「按版本选适配」
 
-**分发不会按宿主版本自动下载对应适配版本。** 本插件打包时把 `@deepseek-ai/dsh-*` 依赖锁死在某一个 release（当前 0.2.0-rc.2），别人拉到的就是同一份 `package.json`；npm 不会"看对方 dsh 版本 → 选不同版本的 dsh-* 依赖"。真正的版本闸门是 dsh 的两处兼容性声明：
+**分发不会按宿主版本自动下载对应适配版本。** 本插件打包时把 `@deepseek-ai/dsh-*` 依赖锁死在某一个 release（当前 0.2.2-rc.1），别人拉到的就是同一份 `package.json`；npm 不会"看对方 dsh 版本 → 选不同版本的 dsh-* 依赖"。真正的版本闸门是 dsh 的两处兼容性声明：
 
-- `dsh.compatibility.dshReleases`：官方字段，精确列出本包适配的 release（如 `{ "0.2.0-rc.2": "compatible" }`）。安装器/市场在对方 dsh 版本不在白名单时**拒绝或警告**，而不是自动换一个适配版本。
-- `engines.dsh`：npm 风格的范围闸门（当前 `>=0.2.0-rc.2 <0.3.0`），语义与上面互补。
+- `dsh.compatibility.dshReleases`：官方字段，精确列出本包适配的 release（如 `{ "0.2.2-rc.1": "compatible" }`）。安装器/市场在对方 dsh 版本不在白名单时**拒绝或警告**，而不是自动换一个适配版本。
+- `engines.dsh`：npm 风格的范围闸门（当前 `>=0.2.2-rc.1 <0.3.0`），语义与上面互补。
 
 运行时实际用的 `@deepseek-ai/dsh-*` 实例由**宿主 dsh 自带**（客户端半从平台模块表取 cordis/store/slots/primitives，Host 半由 Node 按宿主 `node_modules` 解析），插件代码只是复用宿主环境里的版本——只要代码用的 API 在该 dsh 版本里存在即可。想让 0.1.7 的 dsh 也能用，得单独发一份 pin 回 0.1.7-rc.2 的包（下方脚本一键生成），即"多版本并行发布"，用户按自己的 dsh 版本装对应那份。
 
 本插件跟随 deepseek-harness 的 release，但 dsh 的包版本规则有两点容易踩坑：
 
-1. **`@deepseek-ai/dsh-*` 整条线共用同一个 release 版本号**（0.2.0-rc.2 的所有 dsh-* 包都标 0.2.0-rc.2）。
-2. **`@deepseek-ai/cordis` 与 `@deepseek-ai/schemastery` 是独立版本号，不跟随 release**（0.2.0-rc.2 时代仍是 cordis `~4.0.4`、schemastery `~3.18.4`），无脑把全部依赖改成同一个 release 会 404。
-3. **`0.2.0-rc.2` 起 `dsh-scope` 成为 peer 依赖**：`dsh-session` / `dsh-api-remotes` 把 `@deepseek-ai/dsh-scope` 列为 peer，需与 cordis 一样同时写在 `peerDependencies` 与 `devDependencies` 里，否则 `npm install` 报 ERESOLVE。
+1. **`@deepseek-ai/dsh-*` 整条线共用同一个 release 版本号**（0.2.2-rc.1 的所有 dsh-* 包都标 0.2.2-rc.1）。
+2. **`@deepseek-ai/cordis` 与 `@deepseek-ai/schemastery` 是独立版本号，不跟随 release**（0.2.2-rc.1 时代是 cordis `~4.1.0`、schemastery `~3.19.0`），无脑把全部依赖改成同一个 release 会 404。
+3. **`0.2.0` 起 `dsh-scope` 成为 peer 依赖**：`dsh-session` / `dsh-api-remotes` 把 `@deepseek-ai/dsh-scope` 列为 peer，需与 cordis 一样同时写在 `peerDependencies` 与 `devDependencies` 里，否则 `npm install` 报 ERESOLVE。
 
 要把插件重新对准另一个 dsh release，**不要手改版本号**，用脚本：
 
@@ -159,7 +159,7 @@ node scripts/pin-dsh-version.mjs <release> --dry-run  # 只预览不写文件
 
 ## 验证记录
 
-- `tsc` 全量类型检查通过（对着 0.2.0-rc.2 的真实 .d.ts）
-- `node --test`：19/19 通过（请求形状/PCM 封装/Markdown 归一化/文本提取/错误码映射）
+- `tsc` 全量类型检查通过（对着 0.2.2-rc.1 的真实 .d.ts）
+- `node --test`：41/41 通过（请求形状/PCM 封装/Markdown 归一化/文本提取/错误码映射）
 - `scripts/stub-e2e.mjs`：真实 HTTP 桩端到端通过（96,044 字节 WAV）
 - MiMo 实机协议探测通过（与官方 `mimo-tts-wav` skill 同一契约，115,244 字节 WAV）；`scripts/live-e2e.mjs` 可对真实 API 跑完整引擎链路

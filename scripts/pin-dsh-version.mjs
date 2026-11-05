@@ -38,9 +38,13 @@ function parseArgs(argv) {
     if (arg === '--self') opts.self = true
     else if (arg === '--install') opts.install = true
     else if (arg === '--dry-run') opts.dryRun = true
-    else if (arg.startsWith('--cordis=')) opts.cordis = arg.slice('--cordis='.length)
-    else if (arg.startsWith('--schemastery=')) opts.schemastery = arg.slice('--schemastery='.length)
-    else if (arg.startsWith('--')) { console.error(`未知参数：${arg}`); process.exit(2) }
+    else if (arg.startsWith('--cordis=')) {
+      opts.cordis = arg.slice('--cordis='.length)
+      if (opts.cordis === '') { console.error('--cordis= 不能为空，要么给区间，要么去掉该参数'); process.exit(2) }
+    } else if (arg.startsWith('--schemastery=')) {
+      opts.schemastery = arg.slice('--schemastery='.length)
+      if (opts.schemastery === '') { console.error('--schemastery= 不能为空，要么给区间，要么去掉该参数'); process.exit(2) }
+    } else if (arg.startsWith('--')) { console.error(`未知参数：${arg}`); process.exit(2) }
     else if (opts.release === null) opts.release = arg
     else { console.error(`多余的位置参数：${arg}`); process.exit(2) }
   }
@@ -97,7 +101,7 @@ for (const bucket of ['peerDependencies', 'devDependencies']) {
   for (const name of Object.keys(deps)) {
     if (name === '@deepseek-ai/cordis' || name === '@deepseek-ai/schemastery') continue
     if (name === '@deepseek-ai/dsh-scope') continue
-    if (!name.startsWith('@deepseek-ai/dsh-')) continue
+    if (name !== '@deepseek-ai/dsh' && !name.startsWith('@deepseek-ai/dsh-')) continue
     if (deps[name] !== releaseArg) {
       changes.push(`${bucket} ${name}: ${deps[name]} → ${releaseArg}`)
       deps[name] = releaseArg
@@ -129,10 +133,18 @@ if (scopeBorn) {
 }
 
 // 2) cordis / schemastery：独立版本号，优先手动覆盖，否则查 npm 取该 release 的配套区间。
+// npm 查询失败绝不静默回退——旧区间没跟上宿主正是「已开启但未运行」的根因之一。
+const warnings = []
+const queriedCordis = args.cordis === null
+  ? queryRange('@deepseek-ai/dsh-session', 'peerDependencies', 'cordis')
+  : null
 const cordisRange = args.cordis
-  ?? queryRange('@deepseek-ai/dsh-session', 'peerDependencies', 'cordis')
+  ?? queriedCordis
   ?? pkg.peerDependencies?.['@deepseek-ai/cordis']
   ?? pkg.devDependencies?.['@deepseek-ai/cordis']
+if (args.cordis === null && queriedCordis === null) {
+  warnings.push(`npm view 失败，无法查询 ${releaseArg} 的 cordis 配套区间，保持旧值 ${cordisRange ?? '(无)'}；请用 --cordis=... 显式指定或检查网络`)
+}
 if (cordisRange) {
   for (const bucket of ['peerDependencies', 'devDependencies']) {
     if (pkg[bucket]?.['@deepseek-ai/cordis'] !== undefined && pkg[bucket]['@deepseek-ai/cordis'] !== cordisRange) {
@@ -141,10 +153,16 @@ if (cordisRange) {
     }
   }
 }
+const queriedSchem = args.schemastery === null
+  ? queryRange('@deepseek-ai/dsh-host-webserver', 'dependencies', 'schemastery')
+  : null
 const schemRange = args.schemastery
-  ?? queryRange('@deepseek-ai/dsh-host-webserver', 'dependencies', 'schemastery')
+  ?? queriedSchem
   ?? pkg.dependencies?.['@deepseek-ai/schemastery']
   ?? pkg.devDependencies?.['@deepseek-ai/schemastery']
+if (args.schemastery === null && queriedSchem === null) {
+  warnings.push(`npm view 失败，无法查询 ${releaseArg} 的 schemastery 配套区间，保持旧值 ${schemRange ?? '(无)'}；请用 --schemastery=... 显式指定或检查网络`)
+}
 if (schemRange) {
   // schemastery 是运行时依赖（放在 dependencies），也可能同时出现在 devDependencies；
   // 两处都要对齐，否则宿主升到新 release 后仍是旧区间。
@@ -181,9 +199,12 @@ if (args.self && pkg.version !== releaseArg) {
   pkg.version = releaseArg
 }
 
+if (warnings.length > 0) {
+  for (const warning of warnings) console.error(`⚠ ${warning}`)
+}
 if (changes.length === 0) {
   console.log(`已经对准 ${releaseArg}，无需改动。`)
-  process.exit(0)
+  process.exit(warnings.length > 0 ? 1 : 0)
 }
 
 console.log(`将要对准 dsh ${releaseArg}：`)
@@ -191,7 +212,7 @@ for (const c of changes) console.log(`  - ${c}`)
 
 if (args.dryRun) {
   console.log('（--dry-run，未写文件）')
-  process.exit(0)
+  process.exit(warnings.length > 0 ? 1 : 0)
 }
 
 writeFileSync(PKG_PATH, JSON.stringify(pkg, null, 2) + '\n')
@@ -202,3 +223,4 @@ if (args.install) {
 } else {
   console.log('下一步: 跑 npm install 让 node_modules / package-lock.json 跟上，然后 npm run build && npm test。')
 }
+if (warnings.length > 0) process.exitCode = 1
