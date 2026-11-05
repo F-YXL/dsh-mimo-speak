@@ -1,0 +1,65 @@
+# ── 依赖 ──────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+jspm_packages/
+
+# ── 构建产物（lib/ 由 tsc+tsdown 生成，但本仓库与 dsh-text-inject 一致选择提交，
+#    保证 dsh plugin add 免现场编译；故此处不忽略 lib）────────
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# ── 运行时数据（用户数据不属于仓库）────────────────────
+history/
+*.history
+data/
+
+# ── dsh / cordis 运行时产物 ───────────────────────────
+.dsh-module-fallback/
+.dsh-market/
+cordis.yml
+*.patch.yml.bak
+cordis.patch.yml.bak*
+
+# ── 日志 ──────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# ── 环境与密钥（绝不入库）─────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.crt
+.credentials.yaml
+*.secret
+
+# ── 编辑器 / 系统 ─────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── 临时文件 ──────────────────────────────────────────
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+.tmp/
+.temp/
+__pycache__/
+
+# ── npm pack 产物 ─────────────────────────────────────
+*.tgz

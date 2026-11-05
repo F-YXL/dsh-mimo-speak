@@ -1,0 +1,20 @@
+# dsh-mimo-speak bundle layer: one row carries both halves of the plugin.
+#
+# `id: mimo-speak` is the profile entry id — it is also the settings namespace the
+# browser half edits through ctx.configForms, so keep it stable.
+#
+# The row's bare package specifier is what mounts the `./client` browser half
+# (see the client-modules README): the Host loader imports `dsh-mimo-speak`
+# (Node entry) and the Web module system ships `dsh-mimo-speak/client`.
+#
+# To keep the API key out of this file entirely, paste it into the plugin's
+# card on the Plugins page (stored via `credentials/set` under the reference
+# below). To resolve it from the environment in your own override layer
+# instead, override the reference's value there:
+#
+#   - id: mimo-speak
+#     config:
+#       apiKey: !!js process.env.MIMO_API_KEY
+- insert:
+    - id: mimo-speak
+      name: 'dsh-mimo-speak'

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "MiMo TTS speech",
+    "description": "Read assistant replies aloud with MiMo TTS: a configuration card on the Plugins page, a speak button under every finalized reply, and a player with a draggable progress bar"
+  }
+}
