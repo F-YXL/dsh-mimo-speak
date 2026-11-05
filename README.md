@@ -46,7 +46,7 @@
 语音指令的识别交给官方组合包，本插件只负责播报，两者互补：
 
 ```bash
-# 版本要与宿主对齐：DSH 0.2.1-rc.5 → 用 @next 标签
+# 版本要与宿主对齐：DSH 0.2.2-rc.1 → 用 @next 标签
 dsh plugin --profile desktop add @deepseek-ai/dsh-experimental-voice-input-bundle@next
 ```
 
@@ -57,7 +57,7 @@ dsh plugin --profile desktop add @deepseek-ai/dsh-experimental-voice-input-bundl
 
 ```
 dsh-mimo-speak/
-├── package.json            # dsh.bundle + dsh.client manifest，engines.dsh 锁 0.2.0
+├── package.json            # dsh.bundle + dsh.client manifest，engines.dsh 锁 >=0.2.2-rc.1 <0.3.0
 ├── cordis.patch.yml        # bundle 层：插入 id: mimo-speak 行（两侧共用）
 ├── tsconfig.json           # tsc → lib/node（Node 半侧 + 类型）
 ├── tsdown.config.ts        # 官方 clientBundle 的树外复刻 → lib/client.js
@@ -76,7 +76,7 @@ dsh-mimo-speak/
 │       ├── chat-text.ts    # 从 Chat snapshot 取该消息的可朗读文本
 │       ├── use-audio-player.ts  # 播放引擎（单活播放器）
 │       ├── api.ts  status.ts  slots.ts  locales.ts  styles.ts  SpeakerIcon.tsx
-├── tests/                  # 19 项单测（node --test）
+├── tests/                  # 41 项单测（node --test）
 └── scripts/
     ├── stub-e2e.mjs        # 本地桩服务端到端（无需真实密钥）
     └── live-e2e.mjs        # 真实 MiMo API 端到端（需 MIMO_API_KEY）
@@ -86,7 +86,7 @@ dsh-mimo-speak/
 
 ```sh
 npm install          # 装依赖（无 prepare 钩子，需手动构建）
-npm test             # 19 项单测
+npm test             # 41 项单测
 node scripts/stub-e2e.mjs
 ```
 

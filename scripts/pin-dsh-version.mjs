@@ -55,12 +55,24 @@ function nextMinorRange(release) {
   return `>=${release} <${major}.${Number(minor) + 1}.0`
 }
 
-/** 查 npm 上该 release 配套的某个 peer/dependency 区间；失败返回 null。 */
-function queryRange(pkg, field) {
+/**
+ * 查 npm 上该 release 配套的某个 peer/dependency 区间；失败返回 null。
+ * field 传整个对象字段名（如 `peerDependencies`），key 传其中的包名（如 `cordis`）。
+ * 不能用 `npm view ... peerDependencies.cordis` 这种点号深查：对 `@deepseek-ai/` 开头的
+ * 包名，npm 会返回空串，导致静默回退到旧值。
+ */
+function queryRange(pkg, field, key) {
   try {
     const out = execFileSync('npm', ['view', `${pkg}@${releaseArg}`, field, '--json'], { encoding: 'utf8' })
     const parsed = JSON.parse(out)
-    return typeof parsed === 'string' ? parsed : (parsed?.[field] ?? null)
+    const obj = parsed?.[field] ?? parsed
+    if (obj !== null && typeof obj === 'object') {
+      const exact = obj[key]
+      if (typeof exact === 'string') return exact
+      const scoped = obj[`@deepseek-ai/${key}`]
+      if (typeof scoped === 'string') return scoped
+    }
+    return typeof obj === 'string' ? obj : null
   } catch {
     return null
   }
@@ -118,7 +130,7 @@ if (scopeBorn) {
 
 // 2) cordis / schemastery：独立版本号，优先手动覆盖，否则查 npm 取该 release 的配套区间。
 const cordisRange = args.cordis
-  ?? queryRange('@deepseek-ai/dsh-session', 'peerDependencies.cordis')
+  ?? queryRange('@deepseek-ai/dsh-session', 'peerDependencies', 'cordis')
   ?? pkg.peerDependencies?.['@deepseek-ai/cordis']
   ?? pkg.devDependencies?.['@deepseek-ai/cordis']
 if (cordisRange) {
@@ -130,12 +142,17 @@ if (cordisRange) {
   }
 }
 const schemRange = args.schemastery
-  ?? queryRange('@deepseek-ai/dsh-host-webserver', 'dependencies.schemastery')
+  ?? queryRange('@deepseek-ai/dsh-host-webserver', 'dependencies', 'schemastery')
+  ?? pkg.dependencies?.['@deepseek-ai/schemastery']
   ?? pkg.devDependencies?.['@deepseek-ai/schemastery']
 if (schemRange) {
-  if (pkg.devDependencies?.['@deepseek-ai/schemastery'] !== undefined && pkg.devDependencies['@deepseek-ai/schemastery'] !== schemRange) {
-    changes.push(`devDependencies @deepseek-ai/schemastery: ${pkg.devDependencies['@deepseek-ai/schemastery']} → ${schemRange}`)
-    pkg.devDependencies['@deepseek-ai/schemastery'] = schemRange
+  // schemastery 是运行时依赖（放在 dependencies），也可能同时出现在 devDependencies；
+  // 两处都要对齐，否则宿主升到新 release 后仍是旧区间。
+  for (const bucket of ['dependencies', 'devDependencies']) {
+    if (pkg[bucket]?.['@deepseek-ai/schemastery'] !== undefined && pkg[bucket]['@deepseek-ai/schemastery'] !== schemRange) {
+      changes.push(`${bucket} @deepseek-ai/schemastery: ${pkg[bucket]['@deepseek-ai/schemastery']} → ${schemRange}`)
+      pkg[bucket]['@deepseek-ai/schemastery'] = schemRange
+    }
   }
 }
 
