@@ -14,6 +14,7 @@ out/
 history/
 *.history
 data/
+voices/
 
 # ── dsh / cordis 运行时产物 ───────────────────────────
 .dsh-module-fallback/
