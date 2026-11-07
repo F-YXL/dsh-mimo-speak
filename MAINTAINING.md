@@ -9,7 +9,6 @@
 | **唯一源码仓库**（canonical） | `/path/to/dsh-mimo-speak` |
 | 桌面 profile 引用方式 | 软链：`~/.dsh/profiles/desktop/node_modules/dsh-mimo-speak` → 本仓库 |
 | 用户配置层（由应用写入） | `~/.dsh/profiles/desktop/cordis.patch.yml` 中 `- id: mimo-speak` 段 |
-| 语音历史数据（不入库） | `~/.dsh/profiles/<profile>/mimo-speak-recordings/` |
 
 因为 desktop profile 用软链指向本仓库，**改完源码即对 desktop 生效**（需重启应用或重载插件才会重新加载入口）。不要把 `.dsh/profiles/.../node_modules/dsh-mimo-speak` 当成源码改——那只是同一个目录的另一条路。
 
@@ -20,17 +19,14 @@ cd /path/to/dsh-mimo-speak
 
 npm install             # 拉齐 devDependencies（本仓库不提交 node_modules；提交 package-lock.json）
 npm run build           # tsc + tsdown → 重新生成 lib/（lib/ 故意提交，保证免编译安装）
-npm test                # 41 个单测（node --test）
-
-# recordings 测试会写真实 profile 目录；CI/沙箱里用隔离的 DSH_HOME：
-DSH_HOME=$(mktemp -d) sh -c 'mkdir -p "$DSH_HOME/profiles/desktop" && node --test tests/*.test.mjs'
+npm test                # 43 个单测（node --test）
 ```
 
 ## 修改与提交约定
 
 - 遵循仓库根 `AGENTS.md` 的 Conventional Commits 规范：`feat(mimo-speak): ...`、`fix(mimo-speak): ...`。
 - **`lib/` 是提交物**（`.gitignore` 刻意不忽略）：`dsh plugin add` 免现场编译。改源码后必须重新 `npm run build` 并连同 `lib/` 一起提交。
-- 不提交：`node_modules/`、`.env*`、`.credentials.yaml`、`*.tgz`、录音数据。
+- 不提交：`node_modules/`、`.env*`、`.credentials.yaml`、`*.tgz`、合成产物（`tts/*.wav`）。
 - 改 `cordis.patch.yml` 前先想清楚 `id: mimo-speak` 是 profile 入口 id，也是浏览器侧配置命名空间，**不要改这个 id**，否则已存配置会丢。
 
 ## 发布 / 安装

@@ -1,15 +1,16 @@
 /**
  * MiMo TTS speech synthesis, Host half.
  *
- * This plugin answers two questions the browser asks of the Host: what the
- * engine is configured to do (`GET /api/mimo-speak/status`) and what one text
- * sounds like (`POST /api/mimo-speak/synthesize`). The API key never leaves the
- * Host — the browser sends text and receives WAV bytes.
+ * The Host answers the browser's synthesis questions (`/api/mimo-speak/status`,
+ * `/synthesize`, `/synthesize-stream`, `/test`, `/summary`) and registers the
+ * `mimo-tts-say` agent tool that writes WAV files into the session
+ * workspace. The API key never leaves the Host — the browser sends text and
+ * receives WAV bytes.
  *
  * Settings are ordinary volatile Config fields, so the settings service
  * projects them into the configuration form the browser half renders on its
- * `语音合成` settings page. The automatic Plugins-page card is turned off:
- * this plugin owns its own settings page instead.
+ * own Plugins-page card (`plugins.bundle.config`); the automatic card is
+ * turned off because this plugin contributes that card itself.
  * @module dsh-mimo-speak
  */
 import type { Context, Volatile } from '@deepseek-ai/cordis';
@@ -87,7 +88,8 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     muteWhileRecording: z<boolean, boolean, "volatile-defined">;
 }>>, "plain">;
 /**
- * Host registration: the settings presentation policy and the two Web routes.
+ * Host registration: the settings presentation policy, the agent tool, and
+ * the Web routes.
  * @param ctx - plugin context; the routes appear when `webServer` and
  * `connection` exist (Web and Desktop GUI compositions).
  * @param config - live volatile settings.

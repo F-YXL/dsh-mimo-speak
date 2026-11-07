@@ -20,7 +20,7 @@ import type { ChatSnapshot } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { IconLoadingOutlineRegular, IconWarningTriangleOutlineRegular, TextShimmer, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { briefText } from '../brief.ts'
 import { toSpeakableText } from '../normalize.ts'
-import { requestRecording, requestSpeech, requestSpeechStream, requestSummary, speechEngineOf, TtsClientError } from './api.ts'
+import { requestSpeech, requestSpeechStream, requestSummary, speechEngineOf, TtsClientError } from './api.ts'
 import type { SpeechEngine } from './api.ts'
 import { onAudioCaptureStart } from './audio-bus.ts'
 import { latestAssistantMessageId, speakableTextFor } from './chat-text.ts'
@@ -116,8 +116,6 @@ const autoReadLog = (() => {
 /**
  * Produce (or reuse) the object URL for one chunk.
  * @param text - one speakable chunk.
- * @param record - persist this chunk to the speech history (single-chunk
- * replies only, so history still captures short read-alouds).
  * @param signature - how the current configuration sounds; part of the key, so
  * a voice/style change never replays the previous take.
  * @param signal - aborts the request when the reader stops.
@@ -125,14 +123,13 @@ const autoReadLog = (() => {
  */
 async function synthesizeChunkUrl(
   text: string,
-  record: boolean,
   signature: SpeechSignature,
   signal?: AbortSignal,
 ): Promise<CachedSpeech> {
   const key = speechCacheKey(signature, text)
   const hit = cachedSpeech(key)
   if (hit !== undefined) return hit
-  const blob = record ? (await requestRecording({ text })).blob : await requestSpeech({ text }, signal)
+  const blob = await requestSpeech({ text }, signal)
   const chunk: CachedSpeech = { url: URL.createObjectURL(blob), engine: speechEngineOf(blob) }
   cacheSpeech(key, chunk)
   return chunk
@@ -351,8 +348,7 @@ export function SpeakAction(props: SpeakActionProps) {
       for (let index = 0; index < chunks.length; index += 1) {
         // Stop between chunks: a cancelled run must not keep synthesizing.
         if (cancelled()) return
-        const record = chunks.length === 1
-        const chunkAudio = await synthesizeChunkUrl(chunks[index], record, signatureRef.current, signal)
+        const chunkAudio = await synthesizeChunkUrl(chunks[index], signatureRef.current, signal)
         if (gen !== sessionRef.current) return
         if (chunkAudio.engine === 'edge') setEngineUsed('edge')
         playerEnqueue(chunkAudio.url)

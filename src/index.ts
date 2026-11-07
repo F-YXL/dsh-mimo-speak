@@ -1,20 +1,21 @@
 /**
  * MiMo TTS speech synthesis, Host half.
  *
- * This plugin answers two questions the browser asks of the Host: what the
- * engine is configured to do (`GET /api/mimo-speak/status`) and what one text
- * sounds like (`POST /api/mimo-speak/synthesize`). The API key never leaves the
- * Host — the browser sends text and receives WAV bytes.
+ * The Host answers the browser's synthesis questions (`/api/mimo-speak/status`,
+ * `/synthesize`, `/synthesize-stream`, `/test`, `/summary`) and registers the
+ * `mimo-tts-say` agent tool that writes WAV files into the session
+ * workspace. The API key never leaves the Host — the browser sends text and
+ * receives WAV bytes.
  *
  * Settings are ordinary volatile Config fields, so the settings service
  * projects them into the configuration form the browser half renders on its
- * `语音合成` settings page. The automatic Plugins-page card is turned off:
- * this plugin owns its own settings page instead.
+ * own Plugins-page card (`plugins.bundle.config`); the automatic card is
+ * turned off because this plugin contributes that card itself.
  * @module dsh-mimo-speak
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { readFile, stat } from 'node:fs/promises'
+import { stat } from 'node:fs/promises'
 import type { Context, Volatile } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
@@ -23,16 +24,13 @@ import z from '@deepseek-ai/schemastery'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import {
   DEFAULT_BASE_URL, DEFAULT_CHUNK_CHARS, DEFAULT_CREDENTIAL_REF, DEFAULT_EDGE_VOICE, DEFAULT_FALLBACK_ENGINE, DEFAULT_HIGHLIGHT, DEFAULT_MAX_CHARS, DEFAULT_MODEL, DEFAULT_MUTE_WHILE_RECORDING, DEFAULT_PROGRESS_BAR, DEFAULT_READ_SCOPE, DEFAULT_TIMEOUT_MS, DEFAULT_VOICE,
-  MIMOSPEAK_RECORDING_HEADER, MIMOSPEAK_RECORDINGS_PATH, MIMOSPEAK_STATUS_PATH, MIMOSPEAK_SUMMARY_PATH, MIMOSPEAK_SYNTHESIZE_PATH, MIMOSPEAK_SYNTHESIZE_STREAM_PATH, MIMOSPEAK_TEST_PATH,
+  MIMOSPEAK_STATUS_PATH, MIMOSPEAK_SUMMARY_PATH, MIMOSPEAK_SYNTHESIZE_PATH, MIMOSPEAK_SYNTHESIZE_STREAM_PATH, MIMOSPEAK_TEST_PATH,
 } from './settings.ts'
-import type { FallbackEngine, ReadScope, TtsSummaryResult, TtsErrorBody, TtsRecordingsIndex, TtsStatusView, TtsSynthesizeRequest, TtsTestResult } from './settings.ts'
+import type { FallbackEngine, ReadScope, TtsSummaryResult, TtsErrorBody, TtsStatusView, TtsSynthesizeRequest, TtsTestResult } from './settings.ts'
 import { resolveEngineConfig, streamSpeechPcm, synthesizeSpeech, TtsError } from './tts.ts'
 import { synthesizeEdge } from './edge-tts.ts'
 import { summarizeForSpeech } from './summarize.ts'
 import { createSayTool } from './tool.ts'
-import {
-  addVersion, deleteVersion, hasVersion, listRecordings, resynthesize, versionFilePath,
-} from './recordings.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'mimo-speak'
@@ -130,14 +128,16 @@ async function resolveEngineSnapshot(ctx: Context, config: Config): Promise<Retu
 }
 
 /**
- * Host registration: the settings presentation policy and the two Web routes.
+ * Host registration: the settings presentation policy, the agent tool, and
+ * the Web routes.
  * @param ctx - plugin context; the routes appear when `webServer` and
  * `connection` exist (Web and Desktop GUI compositions).
  * @param config - live volatile settings.
  */
 export function apply(ctx: Context, config: Config): void {
-  // This plugin owns its settings page (the browser half's `settings.section`
-  // entry), so it opts out of the automatic Plugins-page config card.
+  // This plugin contributes its own Plugins-page configuration card
+  // (`plugins.bundle.config`); automatic page generation is off so the
+  // namespace does not get a duplicate auto page.
   ctx.inject(['settings'], (child) => {
     child.effect(() => child.settings.configure({ auto: false }, ctx.fiber))
   })
@@ -157,16 +157,6 @@ export function apply(ctx: Context, config: Config): void {
           const style = (request.style ?? '').trim() || engine.style
           const voice = (request.voice ?? '').trim() || engine.voice
           return { wav, model: engine.model, style, voice }
-        },
-        // 同一份音频再进一次录音历史，设置页里可以回放对比
-        persist: async (request, outcome) => {
-          await addVersion(
-            request.text,
-            outcome.style === '' ? undefined : outcome.style,
-            outcome.voice === '' ? undefined : outcome.voice,
-            outcome.model,
-            outcome.wav,
-          )
         },
         log: message => console.info(message),
       }))
@@ -448,178 +438,6 @@ export function apply(ctx: Context, config: Config): void {
         })()
       },
     }), `dsh-mimo-speak: POST ${MIMOSPEAK_TEST_PATH}`)
-
-    // Parse a request's query string without trusting Node's URL parsing of a
-    // possibly-relative req.url; a dummy base makes it absolute.
-    const readQuery = (req: IncomingMessage): URLSearchParams => {
-      const url = new URL(req.url ?? '', 'http://localhost')
-      return url.searchParams
-    }
-
-    // GET lists the history; POST synthesizes and persists a new version.
-    child.effect(() => child.webServer.register({
-      kind: 'exact',
-      path: MIMOSPEAK_RECORDINGS_PATH,
-      handler: (req, res) => {
-        if (fence(req, res)) return
-        if (req.method === 'GET') {
-          void listRecordings().then((index: TtsRecordingsIndex) => sendJson(res, 200, index))
-          return
-        }
-        if (req.method !== 'POST') {
-          sendError(res, 405, { error: { code: 'bad-request', message: 'GET or POST only.' } })
-          return
-        }
-        void (async () => {
-          const parsed = await readJsonBody(req)
-          if (parsed === undefined) {
-            sendError(res, 400, { error: { code: 'bad-request', message: 'Request body is not a JSON object.' } })
-            return
-          }
-          const request = parsed as Partial<TtsSynthesizeRequest>
-          if (typeof request.text !== 'string' || request.text.trim() === '') {
-            sendError(res, 400, { error: { code: 'bad-request', message: 'A non-empty `text` string is required.' } })
-            return
-          }
-          const engine = await resolveEngineSnapshot(ctx, config)
-          try {
-            const wav = await synthesizeSpeech(engine, {
-              text: request.text,
-              style: typeof request.style === 'string' ? request.style : undefined,
-              voice: typeof request.voice === 'string' ? request.voice : undefined,
-            })
-            const style = (typeof request.style === 'string' ? request.style : '').trim() || engine.style
-            const voice = (typeof request.voice === 'string' ? request.voice : '').trim() || engine.voice
-            const { recording, version } = await addVersion(
-              request.text, style || undefined, voice || undefined, engine.model, wav,
-            )
-            res.statusCode = 200
-            res.setHeader('content-type', 'audio/wav')
-            res.setHeader('cache-control', 'no-store')
-            res.setHeader(MIMOSPEAK_RECORDING_HEADER, Buffer.from(JSON.stringify({ recId: recording.id, verId: version.id })).toString('base64'))
-            res.end(Buffer.from(wav))
-          } catch (error) {
-            const failure = error instanceof TtsError
-              ? error
-              : new TtsError('upstream-error', error instanceof Error ? error.message : String(error))
-            const status = failure.code === 'not-configured' ? 503
-              : failure.code === 'bad-request' || failure.code === 'text-too-long' ? 400
-                : failure.code === 'timeout' ? 504
-                  : 502
-            sendError(res, status, { error: { code: failure.code, message: failure.message } })
-          }
-        })()
-      },
-    }), `dsh-mimo-speak: ${MIMOSPEAK_RECORDINGS_PATH}`)
-
-    // Re-synthesize a recording's text with the engine's current settings and
-    // append a new version; older takes are preserved for comparison.
-    child.effect(() => child.webServer.register({
-      kind: 'exact',
-      path: `${MIMOSPEAK_RECORDINGS_PATH}/resynth`,
-      handler: (req, res) => {
-        if (fence(req, res)) return
-        if (req.method !== 'POST') {
-          sendError(res, 405, { error: { code: 'bad-request', message: 'POST only.' } })
-          return
-        }
-        const recId = readQuery(req).get('rec')
-        if (recId === null) {
-          sendError(res, 400, { error: { code: 'bad-request', message: 'The `rec` query is required.' } })
-          return
-        }
-        void (async () => {
-          const index = await listRecordings()
-          const recording = index.entries.find(entry => entry.id === recId)
-          if (recording === undefined) {
-            sendError(res, 404, { error: { code: 'bad-request', message: 'Unknown recording.' } })
-            return
-          }
-          const engine = await resolveEngineSnapshot(ctx, config)
-          try {
-            const wav = await synthesizeSpeech(engine, { text: recording.text })
-            const added = await resynthesize(
-              recId, engine.style || undefined, engine.voice || undefined, engine.model, wav,
-            )
-            if (added === undefined) {
-              sendError(res, 404, { error: { code: 'bad-request', message: 'Recording vanished.' } })
-              return
-            }
-            sendJson(res, 200, { recId: added.recording.id, verId: added.version.id })
-          } catch (error) {
-            const failure = error instanceof TtsError
-              ? error
-              : new TtsError('upstream-error', error instanceof Error ? error.message : String(error))
-            const status = failure.code === 'not-configured' ? 503
-              : failure.code === 'timeout' ? 504
-                : 502
-            sendError(res, status, { error: { code: failure.code, message: failure.message } })
-          }
-        })()
-      },
-    }), `dsh-mimo-speak: ${MIMOSPEAK_RECORDINGS_PATH}/resynth`)
-
-    // Delete one version (file + index entry).
-    child.effect(() => child.webServer.register({
-      kind: 'exact',
-      path: `${MIMOSPEAK_RECORDINGS_PATH}/version`,
-      handler: (req, res) => {
-        if (fence(req, res)) return
-        if (req.method !== 'DELETE') {
-          sendError(res, 405, { error: { code: 'bad-request', message: 'DELETE only.' } })
-          return
-        }
-        const recId = readQuery(req).get('rec')
-        const verId = readQuery(req).get('ver')
-        if (recId === null || verId === null) {
-          sendError(res, 400, { error: { code: 'bad-request', message: 'The `rec` and `ver` queries are required.' } })
-          return
-        }
-        void deleteVersion(recId, verId).then((ok: boolean) => {
-          if (!ok) {
-            sendError(res, 404, { error: { code: 'bad-request', message: 'Unknown recording or version.' } })
-            return
-          }
-          res.statusCode = 204
-          res.end()
-        })
-      },
-    }), `dsh-mimo-speak: ${MIMOSPEAK_RECORDINGS_PATH}/version`)
-
-    // Serve one version's WAV. Authorization is the index, not the path, so a
-    // request can only reach a version that actually exists.
-    child.effect(() => child.webServer.register({
-      kind: 'exact',
-      path: `${MIMOSPEAK_RECORDINGS_PATH}/file`,
-      handler: (req, res) => {
-        if (fence(req, res)) return
-        if (req.method !== 'GET') {
-          sendError(res, 405, { error: { code: 'bad-request', message: 'GET only.' } })
-          return
-        }
-        const recId = readQuery(req).get('rec')
-        const verId = readQuery(req).get('ver')
-        if (recId === null || verId === null) {
-          sendError(res, 400, { error: { code: 'bad-request', message: 'The `rec` and `ver` queries are required.' } })
-          return
-        }
-        void (async () => {
-          if (!(await hasVersion(recId, verId))) {
-            sendError(res, 404, { error: { code: 'bad-request', message: 'Unknown recording or version.' } })
-            return
-          }
-          try {
-            const data = await readFile(versionFilePath(recId, verId))
-            res.statusCode = 200
-            res.setHeader('content-type', 'audio/wav')
-            res.setHeader('cache-control', 'no-store')
-            res.end(data)
-          } catch {
-            sendError(res, 404, { error: { code: 'bad-request', message: 'File missing on disk.' } })
-          }
-        })()
-      },
-    }), `dsh-mimo-speak: ${MIMOSPEAK_RECORDINGS_PATH}/file`)
   })
 }
 

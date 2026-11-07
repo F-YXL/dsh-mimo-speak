@@ -1,7 +1,7 @@
 {
   "name": "dsh-mimo-speak",
   "version": "0.1.0",
-  "description": "MiMo TTS speech for DeepSeek Harness: select a preset voice on the settings card, read any assistant reply aloud, and optionally auto-read each new reply with the configured voice and style",
+  "description": "MiMo TTS speech for DeepSeek Harness: select a preset voice on the Plugins-page card, read any assistant reply aloud, and optionally auto-read each new reply with the configured voice and style",
   "icon": "./icon.svg",
   "type": "module",
   "main": "./lib/node/index.js",

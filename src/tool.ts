@@ -6,8 +6,7 @@
  * free of any IM-specific knowledge.
  *
  * Output goes to `<session cwd>/tts/`: channel-side发送工具通常只接受工作区内的
- * 路径，写到别处（比如本插件的录音目录）会被拒绝。同一份音频还会追加进录音
- * 历史（`mimo-speak-recordings`），方便在设置页回放。
+ * 路径，写到别处（比如本插件的录音目录）会被拒绝。
  * @module dsh-mimo-speak/tool
  */
 
@@ -28,7 +27,7 @@ export interface SayRequest {
   style?: string
 }
 
-/** 一次合成产物 + 实际生效的音色/风格（用于归档）。 */
+/** 一次合成产物 + 实际生效的音色/风格。 */
 export interface SayOutcome {
   wav: Uint8Array
   model: string
@@ -38,8 +37,6 @@ export interface SayOutcome {
 
 export interface SayToolDeps {
   synthesize(request: SayRequest): Promise<SayOutcome>
-  /** 追加进录音历史；失败只记日志，不影响发送。 */
-  persist?(request: SayRequest, outcome: SayOutcome): Promise<void>
   log?(message: string): void
 }
 
@@ -81,7 +78,7 @@ export function wavDurationMs(bytes: Uint8Array): number {
   return Math.round((frames / sampleRate) * 1000)
 }
 
-/** 工具定义：执行一次「合成 → 落盘 → 归档」。 */
+/** 工具定义：执行一次「合成 → 落盘」。 */
 export function createSayTool(deps: SayToolDeps): {
   name: string
   description: string
@@ -106,11 +103,11 @@ export function createSayTool(deps: SayToolDeps): {
         },
         voice: {
           type: 'string',
-          description: '可选：临时换一个预置音色。不传就用设置页里的默认音色（或克隆音色）。',
+          description: '可选：临时换一个预置音色。不传就用插件页配置卡片里的默认音色（或克隆音色）。',
         },
         style: {
           type: 'string',
-          description: '可选：说话风格，比如「开心」「语速慢」「东北话」。不传就用设置页里的默认风格。',
+          description: '可选：说话风格，比如「开心」「语速慢」「东北话」。不传就用插件页配置卡片里的默认风格。',
         },
       },
       required: ['text'],
@@ -156,14 +153,6 @@ export function createSayTool(deps: SayToolDeps): {
       const path = join(dir, speechFileName())
       await writeFile(path, outcome.wav)
       deps.log?.(`[mimo-speak] 合成语音 ${path}（${outcome.wav.length} 字节）`)
-
-      if (deps.persist !== undefined) {
-        try {
-          await deps.persist(request, outcome)
-        } catch (error) {
-          deps.log?.(`[mimo-speak] 语音归档失败（不影响发送）：${error instanceof Error ? error.message : String(error)}`)
-        }
-      }
       return { path, bytes: outcome.wav.length, durationMs: wavDurationMs(outcome.wav) }
     },
   }

@@ -1,13 +1,10 @@
 /**
  * MiMo TTS speech synthesis, browser half.
  *
- * Three contributions, all registered through the typed slot system:
+ * Two contributions, both registered through the typed slot system:
  * - `plugins.bundle.config` (keyed by the npm package name): the plugin's
  *   configuration card on the Plugins page, mounted on the bundle's detail
  *   page — the official seat for a bundle's own configuration;
- * - `settings.section`: the `语音历史` page (recorded speech, versions,
- *   re-synthesis), mounted while the Host serves this plugin's `mimo-speak`
- *   configuration namespace;
  * - `conversation.chat.assistant-actions`: the volume button under every
  *   finalized assistant message, with its floating player (draggable progress
  *   bar) once audio exists.
@@ -26,8 +23,8 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 // namespace (credentials/set stores the typed API key, same as the official
 // add-model credential editor).
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
-// Type-only: pulls the ctx.configForms merge and the settings.section SlotMap
-// entry (the settings domain base owns both declarations).
+// Type-only: pulls the ctx.configForms merge (the settings domain base owns
+// the declaration).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls the SlotRegistry service merge (ctx.slots).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -36,22 +33,20 @@ import type { TtsSettings } from '../settings.ts'
 import { BundleConfigCard } from './BundleConfigCard.tsx'
 import { requestSpeech } from './api.ts'
 import { NS, en, zh } from './locales.ts'
-import { RecordingsPage } from './RecordingsPage.tsx'
 import { SpeakAction } from './SpeakAction.tsx'
 import { TtsSettingsController } from './settings-controller.ts'
 import { ensureTtsStatus, ttsStatusStore } from './status.ts'
 import { injectStyles } from './styles.ts'
 
 export type {
-  BundleConfigCardProps, RecordingsPageProps, SpeakActionInjected, SpeakActionProps,
+  BundleConfigCardProps, SpeakActionInjected, SpeakActionProps,
 } from './slots.ts'
 
 /** Required services (cordis fiber inject); remote.credentials stores the API key. */
 export const inject = ['slots', 'locale', 'configForms', 'remote', 'remote.credentials']
 
 /**
- * Mount the speak entries, the Plugins-page configuration card, and the
- * speech-history settings page.
+ * Mount the speak entry and the Plugins-page configuration card.
  * @param ctx - the browser plugin context.
  */
 export function apply(ctx: ClientContext): void {
@@ -68,9 +63,9 @@ export function apply(ctx: ClientContext): void {
   )
   ctx.effect(() => () => { controller.dispose() }, 'dsh-mimo-speak: settings form')
 
-  // The configuration card and the history page both edit or read the
-  // plugin's configuration namespace, so they exist only while the Host
-  // serves it — a deployment without the plugin shows no trace of either.
+  // The configuration card edits the plugin's configuration namespace, so it
+  // exists only while the Host serves it — a deployment without the plugin
+  // shows no trace of it.
   ctx.effect(
     () => ctx.configForms.whileServed([MIMOSPEAK_NAMESPACE], () => {
       // Keyed by the package name: the Plugins page dispatches
@@ -81,16 +76,9 @@ export function apply(ctx: ClientContext): void {
         locale: NS,
         inject: () => controller.inject(),
       }, BundleConfigCard))
-      const offPage = ctx.slots.inject('settings.section', () => ctx.slots.register({
-        name: 'settings.section',
-        id: 'mimo-speak',
-        order: 20,
-        label: () => t('nav'),
-        locale: NS,
-      }, RecordingsPage))
-      return () => { offPage(); offCard() }
+      return () => { offCard() }
     }),
-    'dsh-mimo-speak: plugins-page card and history page',
+    'dsh-mimo-speak: plugins-page card',
   )
 
   // Automatic read-aloud needs the resolved engine settings before the user

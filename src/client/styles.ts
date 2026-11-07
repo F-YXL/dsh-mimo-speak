@@ -151,32 +151,6 @@ export const CSS = `
 @media (hover: hover) {
   [data-actions-reveal="hover"]:has(.mimo-speak-open) .actions { opacity: 1; }
 }
-
-.mimo-speak-recordingsPage { display: flex; flex-direction: column; }
-.mimo-speak-recordingsSection {
-  margin-top: 20px; padding-top: 16px;
-  border-top: 1px solid var(--dsw-alias-border-l2);
-}
-.mimo-speak-recordingsTitle { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--dsw-alias-label-primary); }
-.mimo-speak-recordingsHintText { margin: 0 0 12px; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
-.mimo-speak-recordingsEmpty { margin: 4px 0; font-size: 12px; color: var(--dsw-alias-label-tertiary); }
-.mimo-speak-recording { padding: 10px 0; border-top: 1px solid var(--dsw-alias-border-l3); }
-.mimo-speak-recording:first-of-type { border-top: none; }
-.mimo-speak-recordingText {
-  margin: 0 0 6px; font-size: 13px; line-height: 18px; color: var(--dsw-alias-label-primary);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-.mimo-speak-versions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.mimo-speak-version { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.mimo-speak-versionAudio { height: 32px; flex: 1 1 200px; min-width: 160px; }
-.mimo-speak-versionMeta { font-size: 11px; color: var(--dsw-alias-label-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.mimo-speak-recButton {
-  height: 26px; padding: 0 12px; font-size: 12px; cursor: pointer;
-  border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-sm);
-  background: var(--dsw-alias-button-tool-bar-fill); color: var(--dsw-alias-label-primary);
-}
-.mimo-speak-recButton:hover:not(:disabled) { background: var(--dsw-alias-button-tool-bar-hover); }
-.mimo-speak-recButton:disabled { opacity: 0.6; cursor: default; }
 `
 
 /**

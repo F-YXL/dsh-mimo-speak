@@ -1,6 +1,6 @@
 # dsh-mimo-speak — MiMo TTS 语音合成插件（DeepSeek Harness 0.2.2-rc.1）
 
-把助手回复"读出来"的 DSH 插件：**"插件"页里的配置卡片** + **每条已定稿助手回复动作行里的音量按钮** + **带可拖动进度条的内联播放器** + **设置页里的"语音历史"**。语音由小米 MiMo TTS（`mimo-v2.5-tts`）合成，API Key 只存在于宿主侧，浏览器只发送文本、收到 WAV。
+把助手回复"读出来"的 DSH 插件：**"插件"页里的配置卡片** + **每条已定稿助手回复动作行里的音量按钮** + **带可拖动进度条的内联播放器**。语音由小米 MiMo TTS（`mimo-v2.5-tts`）合成，API Key 只存在于宿主侧，浏览器只发送文本、收到 WAV。
 
 面向 **deepseek-harness `0.2.2-rc.1`**（`engines.dsh: ">=0.2.2-rc.1 <0.3.0"`），完全按照官方插件规范实现：
 
@@ -9,8 +9,8 @@
 | [打包与安装插件](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/user/develop/basic/publish.zh.md)（bundle 组合包） | `package.json` 声明 `dsh.bundle.patch` + `cordis.patch.yml` 插入 `id: mimo-speak` 行；同包携带 `dsh.client` 浏览器半侧（裸包名行同时挂载 Host/Client 两侧） |
 | [插件配置](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/user/develop/basic/config.zh.md)（无硬编码可调参数） | 全部参数走 Schemastery Config + `.volatile()`（接口地址/模型/音色/克隆样本/风格/字数/超时均可配）；密钥 `role('secret')` |
 | [即时配置表单](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/cookbook/adding-a-settings-card.zh.md) | `ctx.configForms`（`mimo-speak` 命名空间）+ `SettingsFormModel` 标准表单；`ctx.settings.configure({ auto: false })` 关闭自动页策略，配置卡片自己注册进官方 `plugins.bundle.config`（key = npm 包名） |
-| [Web Client Slots](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/subsystems/slots.zh.md) | `plugins.bundle.config`（插件页配置卡）+ `conversation.chat.assistant-actions`（消息动作行）+ `settings.section`（语音历史页）三个席位，`ctx.slots.inject` 贡献、effect 生命周期托管；跨插件只 `import type` 取 slot 声明 |
-| [Web Server 子系统](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/subsystems/web-server.zh.md) | `ctx.webServer.register` 挂 `/api/mimo-speak/status`、`/api/mimo-speak/synthesize` 两条路由，入口先过 `ctx.connection.requestRejection` 信任栅栏（Host/Origin + 浏览器鉴权），LAN 裸请求无法白嫖 API 额度 |
+| [Web Client Slots](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/subsystems/slots.zh.md) | `plugins.bundle.config`（插件页配置卡）+ `conversation.chat.assistant-actions`（消息动作行）两个席位，`ctx.slots.inject` 贡献、effect 生命周期托管；跨插件只 `import type` 取 slot 声明 |
+| [Web Server 子系统](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/subsystems/web-server.zh.md) | `ctx.webServer.register` 挂 `/api/mimo-speak/status`、`/synthesize`、`/synthesize-stream`、`/test`、`/summary` 五条路由，入口先过 `ctx.connection.requestRejection` 信任栅栏（Host/Origin + 浏览器鉴权），LAN 裸请求无法白嫖 API 额度 |
 | [客户端模块系统](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/modules/README.zh.md) | `lib/client.js` 为 lazy-CJS factory（`window.__ModuleLoader__.load({ id, factory })`），外部仅平台模块（react / cordis / client-store / ui-primitives），跨插件只经 Cordis 服务与 `import type`（构建期 purity gate 强制） |
 | [extension-cookbook · UI 插件](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/cookbook/extension-cookbook.zh.md) | 业务数据不进组件 props 面：文本经 `useChat` 从 Conversation binding 派生，配置经 `configForms`，合成经宿主路由，文案经 `ctx.locale`（zh/en 双语） |
 
@@ -29,17 +29,14 @@
    - **停止是真取消**：中断在途请求、作废本轮、清空已排程音频——后续句子不会再合成、不会再"流"出来；Esc 同样生效
    - 同时只有一条在播；播放中动作行不再悬停淡出
    - 失败就地提示（未配置/超时/上游拒绝/无文本等稳定错误码 → 本地化文案）
-3. **设置 → 语音历史**
-   - 每次朗读自动保存；按文本分组、多版本并列
-   - 逐版本回放、「重新合成」（用当前配置重读并保留旧版本对比）、「删除」
-4. **朗读范围四档**：简要播报（**先摘要再念**：用当前对话模型把回复浓缩成 1–2 句口播摘要，约 80 字；模型不可用时退回规则摘要——每段第一句、上限 6 句/260 字）/ 只读正文 / 智能（正文+短代码）/ 全部
-5. **Agent 工具 `mimo-tts-say`**（`tools` 服务在的组合里注册）
+3. **朗读范围四档**：简要播报（**先摘要再念**：用当前对话模型把回复浓缩成 1–2 句口播摘要，约 80 字；模型不可用时退回规则摘要——每段第一句、上限 6 句/260 字）/ 只读正文 / 智能（正文+短代码）/ 全部
+4. **Agent 工具 `mimo-tts-say`**（`tools` 服务在的组合里注册）
    - 参数：`text`（必填）、`voice`、`style`（可选覆盖）
-   - 行为：合成 → 写 `<会话工作区>/tts/speech-<时间戳>-<8位随机>.wav` → 返回绝对路径 + 字节数 + 时长；同一份音频再追加进「语音历史」
+   - 行为：合成 → 写 `<会话工作区>/tts/speech-<时间戳>-<8位随机>.wav` → 返回绝对路径 + 字节数 + 时长
    - **只产出文件，不发消息**：要真的发出去，把返回的 path 交给聊天渠道的发语音工具（QQ 通道是 `the channel's voice-send tool`）
    - 为什么写进工作区：渠道侧的发送工具通常只接受工作区内的路径，写到录音目录会被拒
    - 工具描述里写清了「用户要求语音回复、或内容适合朗读时才用」，平时的回复还是文字
-6. **安全边界**：密钥只在宿主；`/api/mimo-speak/*` 路由先过 Connection 信任栅栏；请求体 1MiB 上限；文本超预算在句末截断朗读开头。工具和网页朗读共用同一套 settings/凭据，不额外存密钥。
+5. **安全边界**：密钥只在宿主；`/api/mimo-speak/*` 路由先过 Connection 信任栅栏；请求体 1MiB 上限；文本超预算在句末截断朗读开头。工具和网页朗读共用同一套 settings/凭据，不额外存密钥。
 
 ## 与官方语音输入插件配合
 
@@ -63,20 +60,19 @@ dsh-mimo-speak/
 ├── tsdown.config.ts        # 官方 clientBundle 的树外复刻 → lib/client.js
 ├── icon.svg  locale/{zh,en}.json
 ├── src/
-│   ├── index.ts            # Host 插件：Config schema + 两条 Web 路由
+│   ├── index.ts            # Host 插件：Config schema + Web 路由
 │   ├── tts.ts              # MiMo TTS 客户端（/chat/completions + audio 输出块）
 │   ├── wav.ts  normalize.ts# PCM→WAV 封装；Markdown→可朗读文本
 │   ├── settings.ts         # 两侧共享：命名空间/路由/默认值/线格式类型
 │   └── client/
-│       ├── index.ts        # 浏览器插件：三个 slot 席位注册
+│       ├── index.ts        # 浏览器插件：两个 slot 席位注册
 │       ├── SpeakAction.tsx # 消息动作行的音量按钮 + 浮层播放器
 │       ├── PlayerBar.tsx   # 可拖动进度条（role=slider，指针+键盘）
 │       ├── BundleConfigCard.tsx + settings-controller.ts  # 插件页配置卡片
-│       ├── RecordingsPage.tsx + RecordingsList.tsx        # 语音历史设置页
 │       ├── chat-text.ts    # 从 Chat snapshot 取该消息的可朗读文本
 │       ├── use-audio-player.ts  # 播放引擎（单活播放器）
 │       ├── api.ts  status.ts  slots.ts  locales.ts  styles.ts  SpeakerIcon.tsx
-├── tests/                  # 41 项单测（node --test）
+├── tests/                  # 43 项单测（node --test）
 └── scripts/
     ├── stub-e2e.mjs        # 本地桩服务端到端（无需真实密钥）
     └── live-e2e.mjs        # 真实 MiMo API 端到端（需 MIMO_API_KEY）
@@ -86,7 +82,7 @@ dsh-mimo-speak/
 
 ```sh
 npm install          # 装依赖（无 prepare 钩子，需手动构建）
-npm test             # 41 项单测
+npm test             # 43 项单测
 node scripts/stub-e2e.mjs
 ```
 
@@ -100,7 +96,7 @@ dsh --profile demo --dump-config   # 应能看到 "# == dsh-mimo-speak" 层
 dsh --profile demo
 ```
 
-打开 `http://127.0.0.1:3080`：**「插件」页 → dsh-mimo-speak 卡片**里填入 API Key（试听可即时验证），随后每条已定稿回复下都会出现音量按钮；**设置 → 语音历史** 管理已保存的朗读。
+打开 `http://127.0.0.1:3080`：**「插件」页 → dsh-mimo-speak 卡片**里填入 API Key（试听可即时验证），随后每条已定稿回复下都会出现音量按钮。
 
 不想把密钥写进配置文件时，在 profile 的 `cordis.patch.yml` 里覆写该行：
 
@@ -160,6 +156,6 @@ node scripts/pin-dsh-version.mjs <release> --dry-run  # 只预览不写文件
 ## 验证记录
 
 - `tsc` 全量类型检查通过（对着 0.2.2-rc.1 的真实 .d.ts）
-- `node --test`：41/41 通过（请求形状/PCM 封装/Markdown 归一化/文本提取/错误码映射）
+- `node --test`：43/43 通过（请求形状/PCM 封装/Markdown 归一化/文本提取/错误码映射）
 - `scripts/stub-e2e.mjs`：真实 HTTP 桩端到端通过（96,044 字节 WAV）
 - MiMo 实机协议探测通过（与官方 `mimo-tts-wav` skill 同一契约，115,244 字节 WAV）；`scripts/live-e2e.mjs` 可对真实 API 跑完整引擎链路

@@ -1,7 +1,6 @@
 /**
  * Locale bundles for the MiMo TTS plugin: the speak entry under each finalized
- * assistant message, its player, the Plugins-page configuration card, and the
- * speech-history settings page.
+ * assistant message, its player, and the Plugins-page configuration card.
  * @module dsh-mimo-speak/client/locales
  */
 
@@ -14,7 +13,6 @@ export const NS = 'settings.mimo-speak'
 
 /** Locale keys this plugin renders. */
 export type MimottsLocaleKey =
-  | 'nav'
   | 'speak' | 'synthesize' | 'play' | 'pause' | 'stop' | 'progress'
   | 'emptyText' | 'truncated'
   | 'error.notConfigured' | 'error.badRequest' | 'error.timeout'
@@ -43,12 +41,9 @@ export type MimottsLocaleKey =
   | 'progressBar' | 'progressBarHint'
   | 'overridden' | 'reset' | 'invalidNumber'
   | 'readOnly' | 'unavailable' | 'save' | 'saving' | 'saveFailed'
-  | 'recordings' | 'recordingsEmpty' | 'recordingsHint'
-  | 'reSynthesize' | 'reSynthesizing' | 'deleteVersion'
 
 /** English copy. */
 export const en: Record<MimottsLocaleKey, string> = {
-  nav: 'Speech history',
   speak: 'Read aloud',
   synthesize: 'Synthesizing…',
   play: 'Play',
@@ -131,17 +126,10 @@ export const en: Record<MimottsLocaleKey, string> = {
   save: 'Save',
   saving: 'Saving…',
   saveFailed: 'The deployment did not accept these values; they were left for you to correct.',
-  recordings: 'Speech history',
-  recordingsEmpty: 'No speech recorded yet. Read a message aloud and it is saved here.',
-  recordingsHint: 'Every read-aloud is saved. Re-synthesize re-reads the text with the current voice and style, keeping the old take so you can compare.',
-  reSynthesize: 'Re-synthesize',
-  reSynthesizing: 'Re-synthesizing…',
-  deleteVersion: 'Delete',
 }
 
 /** Simplified Chinese copy. */
 export const zh: Record<MimottsLocaleKey, string> = {
-  nav: '语音历史',
   speak: '朗读',
   synthesize: '正在合成…',
   play: '播放',
@@ -224,17 +212,11 @@ export const zh: Record<MimottsLocaleKey, string> = {
   save: '保存',
   saving: '保存中…',
   saveFailed: '本部署没有接受这些值，已保留供你修改。',
-  recordings: '语音历史',
-  recordingsEmpty: '还没有保存的语音。朗读一条消息就会自动存到这里。',
-  recordingsHint: '每次朗读都会保存。「重新合成」用当前音色与风格重读原文，旧版本保留，方便对比。',
-  reSynthesize: '重新合成',
-  reSynthesizing: '正在重新合成…',
-  deleteVersion: '删除',
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    /** MiMo TTS speak entry, player, Plugins-page card, and history page copy. */
+    /** MiMo TTS speak entry, player, and Plugins-page card copy. */
     'settings.mimo-speak': MimottsLocaleKey
   }
 }

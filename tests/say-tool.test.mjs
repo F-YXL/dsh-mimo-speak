@@ -29,19 +29,15 @@ test('wavDurationMs：不是 WAV / 头不完整就返回 0，不瞎算', () => {
   assert.equal(wavDurationMs(new Uint8Array(44)), 0)
 })
 
-test('createSayTool：合成后写进 <cwd>/tts/，并调用归档', async () => {
+test('createSayTool：合成后写进 <cwd>/tts/ 并返回产物信息', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'mimo-speak-say-'))
   try {
     const wav = wrapPcmAsWav(new Uint8Array(24_000 * 2))
-    const persisted = []
     const tool = createSayTool({
       synthesize: async (request) => {
         assert.equal(request.text, '你好')
         assert.equal(request.style, '开心')
         return { wav, model: 'mimo-v2-tts', style: '开心', voice: 'mimo_default' }
-      },
-      persist: async (request, outcome) => {
-        persisted.push({ text: request.text, bytes: outcome.wav.length })
       },
     })
     assert.equal(tool.name, SAY_TOOL)
@@ -53,7 +49,6 @@ test('createSayTool：合成后写进 <cwd>/tts/，并调用归档', async () =>
     assert.equal(existsSync(result.path), true)
     assert.equal(readFileSync(result.path).length, wav.length)
     assert.equal(result.durationMs, 1000)
-    assert.deepEqual(persisted, [{ text: '你好', bytes: wav.length }])
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -66,22 +61,4 @@ test('createSayTool：缺 text / 没工作区都直接报错', async () => {
     /缺少要念的文本/
   )
   await assert.rejects(() => tool.execute({ text: '你好' }, { agent: {} }), /拿不到当前会话的工作区/)
-})
-
-test('createSayTool：归档失败不影响产物和返回值', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'mimo-speak-say-'))
-  try {
-    const wav = wrapPcmAsWav(new Uint8Array(2400))
-    const tool = createSayTool({
-      synthesize: async () => ({ wav, model: 'm', style: '', voice: '' }),
-      persist: async () => {
-        throw new Error('磁盘满了')
-      },
-    })
-    const result = await tool.execute({ text: '你好' }, { agent: { session: { header: { cwd: dir } } } })
-    assert.equal(existsSync(result.path), true)
-    assert.equal(result.bytes, wav.length)
-  } finally {
-    rmSync(dir, { recursive: true, force: true })
-  }
 })

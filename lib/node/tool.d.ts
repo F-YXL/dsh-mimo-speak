@@ -6,8 +6,7 @@
  * free of any IM-specific knowledge.
  *
  * Output goes to `<session cwd>/tts/`: channel-side发送工具通常只接受工作区内的
- * 路径，写到别处（比如本插件的录音目录）会被拒绝。同一份音频还会追加进录音
- * 历史（`mimo-speak-recordings`），方便在设置页回放。
+ * 路径，写到别处（比如本插件的录音目录）会被拒绝。
  * @module dsh-mimo-speak/tool
  */
 /** Tool name: mimo-tts-say.
@@ -20,7 +19,7 @@ export interface SayRequest {
     voice?: string;
     style?: string;
 }
-/** 一次合成产物 + 实际生效的音色/风格（用于归档）。 */
+/** 一次合成产物 + 实际生效的音色/风格。 */
 export interface SayOutcome {
     wav: Uint8Array;
     model: string;
@@ -29,8 +28,6 @@ export interface SayOutcome {
 }
 export interface SayToolDeps {
     synthesize(request: SayRequest): Promise<SayOutcome>;
-    /** 追加进录音历史；失败只记日志，不影响发送。 */
-    persist?(request: SayRequest, outcome: SayOutcome): Promise<void>;
     log?(message: string): void;
 }
 /**
@@ -43,7 +40,7 @@ export declare function speechFileName(now?: number, id?: string): string;
  * 不猜——宁可少给一个数字，也不给模型一个错的时长。
  */
 export declare function wavDurationMs(bytes: Uint8Array): number;
-/** 工具定义：执行一次「合成 → 落盘 → 归档」。 */
+/** 工具定义：执行一次「合成 → 落盘」。 */
 export declare function createSayTool(deps: SayToolDeps): {
     name: string;
     description: string;

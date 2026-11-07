@@ -211,47 +211,7 @@ export interface TtsSynthesizeRequest {
   voice?: string | undefined
 }
 
-/** Sample sentence the settings page's audition button speaks. */
+/** Sample sentence the Plugins-page card's audition button speaks. */
 export const AUDITION_TEXT = '你好，这是 MiMo 语音合成的试听效果。'
 
-/** Route prefix for persisted speech history (list / create / file). */
-export const MIMOSPEAK_RECORDINGS_PATH = `${MIMOSPEAK_API_PREFIX}/recordings`
 
-/**
- * Response header carrying the new recording identity. Its value is the
- * base64 encoding of `JSON.stringify({ recId, verId })` so it survives the
- * `audio/wav` body that the synthesize route streams back.
- */
-export const MIMOSPEAK_RECORDING_HEADER = 'x-mimo-speak-recording'
-
-/** One synthesized version of a recorded text. */
-export interface TtsRecordingVersion {
-  /** Stable version id (uuid). */
-  id: string
-  /** ISO timestamp of when this version was synthesized. */
-  createdAt: string
-  /** Style phrase used for this version, or null when neutral. */
-  style: string | null
-  /** Preset voice used for this version, or null when default. */
-  voice: string | null
-  /** Model id used for this version. */
-  model: string
-}
-
-/** One recorded text and all its synthesized versions. */
-export interface TtsRecording {
-  /** Stable recording-node id (uuid). */
-  id: string
-  /** The spoken text; also the grouping key for versions. */
-  text: string
-  /** ISO timestamp of the first version. */
-  createdAt: string
-  /** Newest version first. */
-  versions: TtsRecordingVersion[]
-}
-
-/** The recordings index returned to the browser. */
-export interface TtsRecordingsIndex {
-  /** Recorded texts, newest first. */
-  entries: TtsRecording[]
-}

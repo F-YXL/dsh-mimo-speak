@@ -12,11 +12,11 @@ import type { SettingsFieldState, SettingsFormScope, SettingsFormShell } from '@
 import type { TtsSettings, TtsSynthesizeRequest, TtsTestResult } from '../settings.ts';
 /** Field names inside the `mimo-speak` settings section. */
 export type TtsSettingsField = keyof TtsSettings;
-/** Synthesis verb shared by the settings card and the speak entries. */
+/** Synthesis verb shared by the Plugins-page card and the speak entries. */
 export type TtsSettingsSynthesize = (request: TtsSynthesizeRequest) => Promise<Blob>;
 /** Stores a credential literal under one reference in the host credentials store. */
 export type TtsSetCredential = (ref: string, value: string) => Promise<boolean>;
-/** What the settings card renders. */
+/** What the Plugins-page card renders. */
 export interface TtsSettingsState extends SettingsFormShell {
     /** The write-only API key control (blank unless a key is being typed). */
     apiKey: SettingsFieldState;

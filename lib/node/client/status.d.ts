@@ -1,8 +1,9 @@
 /**
- * The engine-status mirror shared by the speak entries and the settings page.
+ * The engine-status mirror shared by the speak entries and the Plugins-page
+ * card.
  *
  * One `GET /api/mimo-speak/status` answers every mounted control: entries lazy-
- * load it on first hover/focus, the settings page refreshes it after each
+ * load it on first hover/focus, the Plugins-page card refreshes it after each
  * write that could change whether a key exists. Failures publish the
  * "unconfigured" view rather than an error state — a missing answer must not
  * claim a key exists.
