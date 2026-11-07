@@ -32,6 +32,12 @@ export declare const MIMOSPEAK_SUMMARY_PATH = "/api/mimo-speak/summary";
 export declare const DEFAULT_BASE_URL = "https://api.xiaomimimo.com/v1";
 /** MiMo TTS model id. */
 export declare const DEFAULT_MODEL = "mimo-v2.5-tts";
+/**
+ * MiMo model that clones a voice from a reference sample. Voice-clone
+ * requests must target this model; the reference audio goes into `audio.voice`
+ * as a `data:audio/wav;base64,…` URI, which the default TTS model rejects.
+ */
+export declare const DEFAULT_CLONE_MODEL = "mimo-v2.5-tts-voiceclone";
 /** Preset voice used when no clone sample is configured. */
 export declare const DEFAULT_VOICE = "mimo_default";
 /**

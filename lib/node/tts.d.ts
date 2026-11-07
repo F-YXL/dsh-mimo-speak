@@ -5,8 +5,9 @@
  * endpoint with an `audio` output block: the request carries the text as an
  * assistant message (optionally prefixed with a `<style>…</style>` phrase), and
  * the response carries base64 audio in `choices[0].message.audio.data`. Voice
- * cloning swaps the preset `audio.voice` for an `audio.voice_audio` reference
- * clip. Raw PCM responses are wrapped as WAV so the browser can seek.
+ * cloning targets `mimo-v2.5-tts-voiceclone` and puts the reference clip into
+ * `audio.voice` as a `data:audio/wav;base64,…` URI. Raw PCM responses are
+ * wrapped as WAV so the browser can seek.
  * @module dsh-mimo-speak/tts
  */
 import type { TtsErrorCode } from './settings.ts';

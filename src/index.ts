@@ -23,7 +23,7 @@ import type {} from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import {
-  DEFAULT_BASE_URL, DEFAULT_CHUNK_CHARS, DEFAULT_CREDENTIAL_REF, DEFAULT_EDGE_VOICE, DEFAULT_FALLBACK_ENGINE, DEFAULT_HIGHLIGHT, DEFAULT_MAX_CHARS, DEFAULT_MODEL, DEFAULT_MUTE_WHILE_RECORDING, DEFAULT_PROGRESS_BAR, DEFAULT_READ_SCOPE, DEFAULT_TIMEOUT_MS, DEFAULT_VOICE,
+  DEFAULT_BASE_URL, DEFAULT_CHUNK_CHARS, DEFAULT_CLONE_MODEL, DEFAULT_CREDENTIAL_REF, DEFAULT_EDGE_VOICE, DEFAULT_FALLBACK_ENGINE, DEFAULT_HIGHLIGHT, DEFAULT_MAX_CHARS, DEFAULT_MODEL, DEFAULT_MUTE_WHILE_RECORDING, DEFAULT_PROGRESS_BAR, DEFAULT_READ_SCOPE, DEFAULT_TIMEOUT_MS, DEFAULT_VOICE,
   MIMOSPEAK_STATUS_PATH, MIMOSPEAK_SUMMARY_PATH, MIMOSPEAK_SYNTHESIZE_PATH, MIMOSPEAK_SYNTHESIZE_STREAM_PATH, MIMOSPEAK_TEST_PATH,
 } from './settings.ts'
 import type { FallbackEngine, ReadScope, TtsSummaryResult, TtsErrorBody, TtsStatusView, TtsSynthesizeRequest, TtsTestResult } from './settings.ts'
@@ -128,6 +128,16 @@ async function resolveEngineSnapshot(ctx: Context, config: Config): Promise<Retu
 }
 
 /**
+ * Model that actually reaches MiMo: the clone model whenever a voice sample is
+ * configured, because the default TTS model rejects an `audio.voice` Data URI.
+ * @param engine - resolved engine configuration.
+ * @returns the model id reported to the browser and the agent tool.
+ */
+function effectiveModelOf(engine: ReturnType<typeof resolveEngineConfig>): string {
+  return engine.voiceSamplePath === '' ? engine.model : DEFAULT_CLONE_MODEL
+}
+
+/**
  * Host registration: the settings presentation policy, the agent tool, and
  * the Web routes.
  * @param ctx - plugin context; the routes appear when `webServer` and
@@ -156,7 +166,7 @@ export function apply(ctx: Context, config: Config): void {
           const wav = await synthesizeSpeech(engine, request)
           const style = (request.style ?? '').trim() || engine.style
           const voice = (request.voice ?? '').trim() || engine.voice
-          return { wav, model: engine.model, style, voice }
+          return { wav, model: effectiveModelOf(engine), style, voice }
         },
         log: message => console.info(message),
       }))
@@ -247,7 +257,7 @@ export function apply(ctx: Context, config: Config): void {
             : false
           const status: TtsStatusView = {
             configured: engine.apiKey !== '',
-            model: engine.model,
+            model: effectiveModelOf(engine),
             voice: engine.voice,
             hasVoiceSample,
             baseUrl: engine.baseUrl,
@@ -407,7 +417,7 @@ export function apply(ctx: Context, config: Config): void {
               latencyMs: Date.now() - startedAt,
               audioBytes: wav.length,
               voice: engine.voice,
-              model: engine.model,
+              model: effectiveModelOf(engine),
             }
             sendJson(res, 200, result)
           } catch (error) {

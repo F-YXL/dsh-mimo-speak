@@ -144,7 +144,17 @@ node scripts/pin-dsh-version.mjs <release> --dry-run  # 只预览不写文件
 }
 ```
 
-音色克隆时 `audio` 换成 `{ "format": "wav", "voice_audio": { "format": "wav", "data": "<base64 wav>" } }`；响应 `choices[0].message.audio.data` 为 base64 音频（RIFF 或裸 PCM，裸 PCM 由插件包成 24kHz/16bit/mono WAV）。
+音色克隆时切到 `mimo-v2.5-tts-voiceclone` 模型，参考音频以 Data URI 放进 `audio.voice`：
+
+```json
+{
+  "model": "mimo-v2.5-tts-voiceclone",
+  "audio": { "format": "wav", "voice": "data:audio/wav;base64,<base64 wav>" },
+  "messages": [{ "role": "assistant", "content": "要说的话" }]
+}
+```
+
+响应 `choices[0].message.audio.data` 为 base64 音频（RIFF 或裸 PCM，裸 PCM 由插件包成 24kHz/16bit/mono WAV）。
 
 ## 已知边界
 

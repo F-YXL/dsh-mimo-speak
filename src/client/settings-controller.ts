@@ -229,8 +229,10 @@ export class TtsSettingsController {
       resetField: (field) => { actions.resetField(field) },
       // Drop cached audio on save: the user just asked for different audio, so
       // replaying a take synthesized with the previous voice or style would
-      // quietly ignore the change.
-      save: () => { clearSpeechCache(); actions.save() },
+      // quietly ignore the change. Refresh the status too: a newly set or
+      // cleared clone sample changes `hasVoiceSample`, which decides whether
+      // the speak entry may use the streaming path.
+      save: () => { clearSpeechCache(); actions.save(); void refreshTtsStatus() },
       discard: () => { actions.discard() },
       synthesize: request => requestSpeech(request),
       test: () => requestSpeechTest(),

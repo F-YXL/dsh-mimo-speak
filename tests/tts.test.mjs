@@ -65,7 +65,10 @@ test('synthesizeSpeech applies style and voice overrides', async () => {
   assert.equal(captured.audio.voice, 'alloy')
 })
 
-test('synthesizeSpeech sends the voice-clone sample instead of a preset voice', async () => {
+test('synthesizeSpeech sends the voice-clone sample as a data URI on the voiceclone model', async () => {
+  const sampleWav = new Uint8Array(44)
+  sampleWav.set([0x52, 0x49, 0x46, 0x46], 0) // RIFF
+  sampleWav.set([0x57, 0x41, 0x56, 0x45], 8) // WAVE
   let captured
   const deps = {
     fetch: async (url, init) => {
@@ -74,12 +77,24 @@ test('synthesizeSpeech sends the voice-clone sample instead of a preset voice', 
     },
     readVoiceSample: async (path) => {
       assert.equal(path, '/samples/me.wav')
-      return new Uint8Array([9, 9])
+      return sampleWav
     },
   }
   await synthesizeSpeech({ ...baseConfig, voiceSamplePath: '/samples/me.wav' }, { text: '内容' }, deps)
-  assert.equal(captured.audio.voice, undefined)
-  assert.deepEqual(captured.audio.voice_audio, { format: 'wav', data: Buffer.from([9, 9]).toString('base64') })
+  assert.equal(captured.model, 'mimo-v2.5-tts-voiceclone')
+  assert.equal(captured.audio.voice, `data:audio/wav;base64,${Buffer.from(sampleWav).toString('base64')}`)
+  assert.equal(captured.audio.voice_audio, undefined)
+})
+
+test('synthesizeSpeech refuses a clone sample that is not a WAV file', async () => {
+  const deps = {
+    fetch: async () => { throw new Error('unreachable') },
+    readVoiceSample: async () => new Uint8Array([9, 9]),
+  }
+  await assert.rejects(
+    () => synthesizeSpeech({ ...baseConfig, voiceSamplePath: '/samples/me.mp3' }, { text: '内容' }, deps),
+    (error) => error instanceof TtsError && error.code === 'voice-sample-unreadable',
+  )
 })
 
 test('synthesizeSpeech passes a complete WAV response through untouched', async () => {

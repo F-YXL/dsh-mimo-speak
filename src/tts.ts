@@ -5,8 +5,9 @@
  * endpoint with an `audio` output block: the request carries the text as an
  * assistant message (optionally prefixed with a `<style>…</style>` phrase), and
  * the response carries base64 audio in `choices[0].message.audio.data`. Voice
- * cloning swaps the preset `audio.voice` for an `audio.voice_audio` reference
- * clip. Raw PCM responses are wrapped as WAV so the browser can seek.
+ * cloning targets `mimo-v2.5-tts-voiceclone` and puts the reference clip into
+ * `audio.voice` as a `data:audio/wav;base64,…` URI. Raw PCM responses are
+ * wrapped as WAV so the browser can seek.
  * @module dsh-mimo-speak/tts
  */
 
@@ -14,7 +15,7 @@ import { readFile } from 'node:fs/promises'
 import { clampText, toSpeakableText } from './normalize.ts'
 import { isRiffWav, wrapPcmAsWav } from './wav.ts'
 import {
-  DEFAULT_BASE_URL, DEFAULT_MAX_CHARS, DEFAULT_MODEL, DEFAULT_TIMEOUT_MS, DEFAULT_VOICE,
+  DEFAULT_BASE_URL, DEFAULT_CLONE_MODEL, DEFAULT_MAX_CHARS, DEFAULT_MODEL, DEFAULT_TIMEOUT_MS, DEFAULT_VOICE,
 } from './settings.ts'
 import type { TtsErrorCode } from './settings.ts'
 /** A synthesis failure carrying a stable, UI-mappable code. */
@@ -143,6 +144,7 @@ export async function synthesizeSpeech(
   const voice = (request.voice ?? '').trim() || config.voice
 
   let audio: Record<string, unknown>
+  let model = config.model
   if (config.voiceSamplePath !== '') {
     let sample: Uint8Array
     try {
@@ -154,16 +156,23 @@ export async function synthesizeSpeech(
         cause,
       )
     }
+    model = DEFAULT_CLONE_MODEL
+    if (!isRiffWav(sample)) {
+      throw new TtsError(
+        'voice-sample-unreadable',
+        `The voice-clone sample at ${config.voiceSamplePath} is not a WAV file.`,
+      )
+    }
     audio = {
       format: 'wav',
-      voice_audio: { format: 'wav', data: Buffer.from(sample).toString('base64') },
+      voice: `data:audio/wav;base64,${Buffer.from(sample).toString('base64')}`,
     }
   } else {
     audio = { format: 'wav', voice }
   }
 
   const payload = {
-    model: config.model,
+    model,
     audio,
     messages: [{ role: 'assistant', content }],
   }
