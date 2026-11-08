@@ -23,7 +23,7 @@ A restart (or a plugin reload) is still needed before the host re-imports the en
 ```sh
 npm install          # devDependencies; node_modules is not committed, package-lock.json is
 npm run build        # tsc -> lib/node, tsdown -> lib/client.js
-npm test             # 44 unit tests (node --test)
+npm test             # 62 unit tests (node --test)
 node scripts/stub-e2e.mjs
 npm run check:privacy
 ```
