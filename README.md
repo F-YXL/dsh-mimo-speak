@@ -15,6 +15,30 @@ A dsh plugin with three surfaces:
 
 Speech is synthesized by Xiaomi MiMo TTS (`mimo-v2.5-tts`). The API key lives only on the Host; the browser sends text and receives WAV.
 
+## Install
+
+**Desktop**: open **Plugins → Add plugin (添加插件)**, enter `github:F-YXL/dsh-mimo-speak`, then restart. Or from the terminal:
+
+```sh
+dsh plugin --profile desktop add github:F-YXL/dsh-mimo-speak
+```
+
+**Web**: install into the `web` profile and refresh the page:
+
+```sh
+dsh plugin --profile web add github:F-YXL/dsh-mimo-speak
+```
+
+Pin a release instead of following `main` (recommended once `v0.1.0` is tagged):
+
+```sh
+dsh plugin --profile desktop add 'github:F-YXL/dsh-mimo-speak#v0.1.0'
+```
+
+No build permission is needed — the package ships a prebuilt `lib/` and declares no install scripts. It also shows up in the in-app **Plugin Market** (Plugins → Discover) once the repository is public: it carries the `dsh-plugin` topic, which the marketplaces index.
+
+After installing, open **Plugins → dsh-mimo-speak**, paste the MiMo API key and hit **Audition** — a speaker button appears under every finalized reply. Prefer building from source? See [Install from source or tarball](#install-from-source-or-tarball).
+
 Built against **deepseek-harness `0.2.2-rc.1`** (`engines.dsh: ">=0.2.2-rc.1 <0.3.0"`), following the official plugin spec:
 
 | Spec | Where it lands here |
@@ -43,18 +67,15 @@ Built against **deepseek-harness `0.2.2-rc.1`** (`engines.dsh: ">=0.2.2-rc.1 <0.
 - Node.js `>= 22.19.0`
 - A MiMo API key from <https://api.xiaomimimo.com> (only needed at runtime, never in this repo)
 
-## Install
+## Install from source or tarball
 
-From a checkout:
+From a checkout (the `lib/` commit is prebuilt, so the build step is only needed after you edit `src/`):
 
 ```sh
 git clone https://github.com/F-YXL/dsh-mimo-speak.git
 cd dsh-mimo-speak
-npm install
-npm run build          # regenerates lib/ from src/
 dsh plugin --profile <profile> add ./dsh-mimo-speak
 dsh --profile <profile> --dump-config | grep mimo-speak   # expect a "# == dsh-mimo-speak" layer
-dsh --profile <profile>
 ```
 
 From a packed tarball:
@@ -64,9 +85,7 @@ npm pack
 dsh plugin --profile <profile> add ./dsh-mimo-speak-0.1.0.tgz
 ```
 
-> pnpm 10 and later need build permission for git/local installs: add `dsh-mimo-speak` to that profile's `pnpm-workspace.yaml` under `allowBuilds`, then retry.
-
-Then open the app, go to **Plugins → dsh-mimo-speak**, paste your API key, and hit **Audition** — if you hear speech, the wiring is correct. A speaker button now appears under each finalized reply.
+Then open **Plugins → dsh-mimo-speak**, paste your API key, and hit **Audition** — if you hear speech, the wiring is correct.
 
 ## Configure
 
@@ -213,14 +232,19 @@ The response carries base64 audio in `choices[0].message.audio.data` — either 
 
 ## 安装
 
+**桌面端**：打开「插件 → 添加插件」，填入 `github:F-YXL/dsh-mimo-speak`，然后重启 DSH；也可以在终端执行：
+
 ```sh
-git clone https://github.com/F-YXL/dsh-mimo-speak.git
-cd dsh-mimo-speak
-npm install && npm run build
-dsh plugin --profile <profile> add ./dsh-mimo-speak
+dsh plugin --profile desktop add github:F-YXL/dsh-mimo-speak
 ```
 
-pnpm ≥ 10 首次 git/本地源码安装需要为构建授权：把 `dsh-mimo-speak` 写入该 profile 的 `pnpm-workspace.yaml` → `allowBuilds: { dsh-mimo-speak: true }`，再重试。
+**Web**：装到 `web` profile，重启后刷新页面：
+
+```sh
+dsh plugin --profile web add github:F-YXL/dsh-mimo-speak
+```
+
+仓库公开后，它也会出现在应用内的「插件市场 / Discover」里（仓库带了 `dsh-plugin` topic，市场会自动收录）。从源码构建请见英文「Install from source or tarball」一节；本包自带预构建的 `lib/` 且没有 install 脚本，无需 pnpm 构建授权。
 
 不想把密钥写进配置文件时，在 profile 的 `cordis.patch.yml` 里覆写该行：
 
