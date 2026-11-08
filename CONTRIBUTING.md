@@ -28,7 +28,10 @@ MIMO_API_KEY=... node scripts/live-e2e.mjs
 1. **A behaviour change with a test that fails without it.** If the fix is a bug, the test must reproduce the bug first. "It builds" is not verification.
 2. **`src/` and `lib/` in the same commit.** `lib/` is committed on purpose so users can install without a build step; CI builds and fails on any drift.
 3. **No new dependency** unless it is unavoidable. Every dependency is a supply-chain decision the maintainer has to keep alive.
-4. **No personal data.** Run `npm run check:privacy` before pushing; CI runs it too. Never commit `voices/`, `tts/`, `.env*`, or anything containing a real API key.
+4. **No personal data.** Run `npm run check:privacy` before pushing (CI runs it too).
+   Maintainers must also run `npm run check:privacy:history` before the first push and before
+   each release: it walks every reachable blob and commit identity, which a worktree scan
+   cannot see. Never commit `voices/`, `tts/`, `.env*`, or anything containing a real API key.
 5. **Conventional Commits**, scoped to the plugin:
 
    ```

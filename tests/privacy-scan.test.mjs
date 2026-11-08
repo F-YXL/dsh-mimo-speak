@@ -13,7 +13,13 @@
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { RULES, isProbablyText, markerRules, scanText } from '../scripts/check-privacy.mjs'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import {
+  RULES, isProbablyText, markerRules, rulesFor, scanHistory, scanRepo, scanText,
+} from '../scripts/check-privacy.mjs'
 
 /** Join fragments into a fixture value at run time. */
 const fake = (...parts) => parts.join('')
@@ -51,7 +57,7 @@ const SAMPLES = [
   ['slack-token', fake('xoxb-', '9495712081-fdpkjhobknhc')],
   ['private-key', fake('-----BEGIN RSA ', 'PRIVATE KEY-----')],
   ['bearer-token', fake('Authorization: Bearer ', 'abcdefghijklmnopqrstuvwxyz012345')],
-  ['assigned-secret', fake('const apiKey = "', 'abcdefghijklmnopqrst', '"')],
+  ['assigned-secret', fake('const apiKey = "', 'abc123def456ghixq1', '"')],
 ]
 
 for (const [ruleId, sample] of SAMPLES) {
@@ -103,6 +109,68 @@ test('a line carrying the suppression token is skipped, neighbours are not', () 
   const secret = fake('sk-', 'proj-menhobguffkymdszdqzhcbyv')
   const text = `MIMO_API_KEY=${secret}  // privacy-scan:allow\nMIMO_API_KEY=${secret}\n`
   const findings = scanText(text, 'x.txt')
-  assert.equal(findings.length, 1)
-  assert.equal(findings[0].line, 2)
+  assert.ok(findings.length >= 1, 'the un-suppressed line must be reported')
+  assert.ok(findings.every(f => f.line === 2), 'the suppressed line must never be reported')
+})
+
+test('unquoted YAML/ENV assignments are caught, not just quoted ones', () => {
+  const samples = [
+    fake('apiKey: ', 'live', 'key-abc123456'),
+    fake('apiKey: "', 'abc123def456ghi', '"'),
+    fake('token: ', 'gh', 'x_0123456789abcdef'),
+    fake("password = '", 'hunter2hunter2', "'"),
+  ]
+  for (const sample of samples) {
+    assert.ok(
+      scanText(sample, 'x.txt').some(f => f.rule === 'assigned-secret'),
+      `expected assigned-secret to fire on ${sample}`,
+    )
+  }
+  // Deliberate non-findings: below the length floor, an env-var reference,
+  // a code expression, and an obvious test stub.
+  assert.deepEqual(scanText(fake('apiKey: "', 'abc123', '"'), 'x.txt'), [])
+  assert.deepEqual(scanText('apiKey: MIMO_API_KEY', 'x.txt'), [])
+  assert.deepEqual(scanText('apiKey: this.form.field(API_KEY_CONTROL),', 'x.txt'), [])
+  assert.deepEqual(scanText(fake("apiKey: '", 'stub-key', "',"), 'x.txt'), [])
+})
+
+test('rulesFor merges the local marker file into the rule set', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mimo-markers-'))
+  try {
+    writeFileSync(join(dir, '.privacy-markers'), '# local\nzzmarker\n*host-9f3\n')
+    const rules = rulesFor(dir)
+    assert.ok(rules.length > RULES.length, 'marker rules must be appended')
+    assert.equal(scanText('owner: zzmarker', 'x.txt', rules).length, 1)
+    assert.equal(scanText('host = host-9f3.local', 'x.txt', rules).length, 1)
+    // Without the file there are no marker rules at all.
+    assert.equal(rulesFor(join(dir, 'nope')).length, RULES.length)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('scanHistory finds a leak that scanRepo cannot see', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mimo-repo-'))
+  const git = (...args) => execFileSync('git', args, { cwd: dir, stdio: 'pipe' })
+  try {
+    git('init', '-q')
+    writeFileSync(join(dir, 'leak.md'), fake('see /Users/', 'xxx/x\n'))
+    git('add', '.')
+    git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'add leak')
+    git('rm', '-q', 'leak.md')
+    git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'drop leak')
+
+    assert.deepEqual(scanRepo(dir), [], 'the current tree is clean')
+    const findings = scanHistory(dir)
+    assert.ok(
+      findings.some(f => f.rule === 'home-path'),
+      'the deleted blob must still be reported by the history scan',
+    )
+    assert.ok(
+      findings.every(f => f.rule !== 'commit-identity'),
+      'an example.com committer identity is allowed',
+    )
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

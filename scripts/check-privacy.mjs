@@ -1,15 +1,19 @@
 /**
  * Pre-push privacy gate.
  *
- * Scans every **git-tracked** file — that is, exactly the set that would be
- * published — for credentials, absolute home paths, e-mail addresses and any
- * personal marker you listed locally. Nothing here knows who you are: the
- * personal marker list lives in `.privacy-markers`, which is git-ignored, so
- * the guard itself never leaks the strings it guards against.
+ * Three layers:
+ *   1. every **git-tracked file at HEAD** — exactly the set that gets published;
+ *   2. every **blob reachable from any commit** (`--history`), because
+ *      `git log -p` publishes the past too, not just the current tree;
+ *   3. every **commit identity** (`--history`), author and committer.
+ *
+ * Nothing here knows who you are: the personal marker list lives in
+ * `.privacy-markers`, which is git-ignored, so the guard itself never leaks
+ * the strings it guards against.
  *
  * Usage:
  *   node scripts/check-privacy.mjs              # files only (safe for CI)
- *   node scripts/check-privacy.mjs --history    # also audit commit identities
+ *   node scripts/check-privacy.mjs --history    # files + history + identities
  *   node scripts/check-privacy.mjs --verbose    # print every hit, not just the first 20
  *
  * Exit code: 0 clean, 1 findings, 2 the scan itself failed.
@@ -31,6 +35,9 @@ import { fileURLToPath } from 'node:url'
 /** Repository root, derived from this file's location. */
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
+/** Memory ceiling for a single git call (this repo is a few MB). */
+const GIT_BUFFER = 256 * 1024 * 1024
+
 /**
  * Generic rules that hold for any open-source repository. Each one is a global
  * regular expression and a stable id the output and the tests key on.
@@ -41,14 +48,14 @@ export const RULES = [
     // /Users/<name>, /home/<name>, C:\Users\<name> — a real machine's layout.
     pattern: /(?:\/Users\/|\/home\/|[A-Za-z]:\\+Users\\+)([A-Za-z0-9._-]+)/g,
     message: 'absolute home directory path',
-    /** Paths that are conventionally not personal. */
-    allow: match => /^(shared|runner|user|username|your-name|example|<)/.test(match),
+    /** `match[1]` is the account name; these are conventionally not personal. */
+    allow: (_value, match) => /^(?:shared|runner|user|username|your-name|example|<)/.test(match[1] ?? ''),
   },
   {
     id: 'email',
     pattern: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
     message: 'e-mail address',
-    allow: match => /@(?:users\.noreply\.github\.com|noreply\.github\.com|example\.(?:com|org|net)|example|test\.invalid)$/i.test(match),
+    allow: match => /@(?:users\.noreply\.github\.com|noreply\.github\.com|example\.(?:com|org|net)|test\.invalid)$/i.test(match),
   },
   {
     id: 'openai-key',
@@ -87,10 +94,24 @@ export const RULES = [
   },
   {
     id: 'assigned-secret',
-    // `apiKey: "…"`, `token = '…'`, `password: "…"` with a literal value.
-    pattern: /(?:api[_-]?key|secret|token|password|passwd)\s*[:=]\s*(['"`])([^'"`\n]{12,})\1/gi,
+    // `apiKey: "…"`, `apiKey: sk-live-…`, `token = '…'`, `password: …`.
+    // Quoted and unquoted (YAML/ENV) forms, from 8 characters up.
+    pattern: /(?:api[_-]?key|apikey|secret|token|password|passwd)\s*[:=]\s*(?:'([^'\n]{8,})'|"([^"\n]{8,})"|([A-Za-z0-9._/+=:-]{8,}))/gi,
     message: 'hard-coded credential assignment',
-    allow: match => /(?:process\.env|REDACTED|placeholder|your[-_]|<)/i.test(match),
+    /**
+     * Judge the captured value, not the whole match: an env-var reference, a
+     * placeholder or an ALL_CAPS name is not a secret.
+     */
+    allow: (_value, match) => {
+      const captured = match[1] ?? match[2] ?? match[3] ?? ''
+      if (/^(?:process\.env|REDACTED|placeholder|your[-_]|\$\{|<)/i.test(captured)) return true
+      if (/^[A-Z][A-Z0-9_]*$/.test(captured)) return true            // ENV_VAR name, not a value
+      if (/(?:[()[\]|\\{};:=])|\s/.test(captured)) return true     // a code expression
+      if (/^(?:stub|test|fake|dummy|sample|demo|example|xxx|none|undefined|null|true|false|changeme)/i.test(captured)) return true
+      if (captured.length < 12) return true                          // below the key-length floor
+      if (!/[0-9]/.test(captured)) return true                       // a word, not a key
+      return false
+    },
   },
 ]
 
@@ -146,6 +167,16 @@ export function markerRules(markers) {
 }
 
 /**
+ * The full rule set for one repository: the generic rules plus whatever the
+ * local marker file adds. Exported so tests can prove the merge happens.
+ * @param root - repository root.
+ * @returns rules to scan with.
+ */
+export function rulesFor(root = ROOT) {
+  return [...RULES, ...markerRules(readMarkers(root))]
+}
+
+/**
  * Scan one text blob.
  * @param text - file contents.
  * @param file - repository-relative path, echoed in findings.
@@ -193,19 +224,19 @@ export function isProbablyText(buffer) {
  * @returns repository-relative paths.
  */
 export function trackedFiles(root = ROOT) {
-  return execFileSync('git', ['ls-files', '-z'], { cwd: root, maxBuffer: 64 * 1024 * 1024 })
+  return execFileSync('git', ['ls-files', '-z'], { cwd: root, maxBuffer: GIT_BUFFER })
     .toString('utf8')
     .split('\0')
     .filter(Boolean)
 }
 
 /**
- * Scan the whole repository.
+ * Scan the current tree.
  * @param root - repository root.
  * @returns findings across every tracked text file.
  */
 export function scanRepo(root = ROOT) {
-  const rules = [...RULES, ...markerRules(readMarkers(root))]
+  const rules = rulesFor(root)
   const findings = []
   for (const file of trackedFiles(root)) {
     let buffer
@@ -221,25 +252,84 @@ export function scanRepo(root = ROOT) {
 }
 
 /**
- * Audit commit identities: every author and committer must look like a public
+ * Audit commit identities: every author and committer must use a public
  * handle rather than a personal name + mailbox.
  * @param root - repository root.
  * @returns offending `name <email>` pairs, deduplicated.
  */
-export function scanHistory(root = ROOT) {
+export function scanIdentities(root = ROOT) {
   const log = execFileSync('git', ['log', '--all', '--format=%an <%ae>%n%cn <%ce>'], {
     cwd: root,
-    maxBuffer: 16 * 1024 * 1024,
+    maxBuffer: GIT_BUFFER,
   }).toString('utf8')
   const identities = [...new Set(log.split('\n').map(line => line.trim()).filter(Boolean))]
+  const emailRule = RULES.find(entry => entry.id === 'email')
   const findings = []
   for (const identity of identities) {
     const email = identity.match(/<([^>]+)>/)?.[1] ?? ''
-    const rule = RULES.find(entry => entry.id === 'email')
-    const allowed = rule?.allow ? rule.allow(email) : false
-    if (!allowed) findings.push({ file: '(git history)', line: 0, rule: 'commit-identity', message: 'commit identity leaks a personal mailbox', match: identity })
+    const allowed = emailRule?.allow ? emailRule.allow(email, [email]) : false
+    if (!allowed) {
+      findings.push({
+        file: '(git history)',
+        line: 0,
+        rule: 'commit-identity',
+        message: 'commit identity leaks a personal mailbox',
+        match: identity,
+      })
+    }
   }
   return findings
+}
+
+/**
+ * Scan the content of every blob reachable from any commit — the part
+ * `git log -p` would publish but a worktree scan cannot see.
+ * @param root - repository root.
+ * @returns findings labelled with the commit-less blob path.
+ */
+export function scanBlobs(root = ROOT) {
+  const rules = rulesFor(root)
+  const listing = execFileSync('git', ['rev-list', '--objects', '--all'], {
+    cwd: root,
+    maxBuffer: GIT_BUFFER,
+  }).toString('utf8')
+
+  const paths = new Map()
+  for (const line of listing.split('\n')) {
+    if (line === '') continue
+    const space = line.indexOf(' ')
+    const oid = space === -1 ? line : line.slice(0, space)
+    if (!paths.has(oid)) paths.set(oid, space === -1 ? '' : line.slice(space + 1))
+  }
+
+  const findings = []
+  for (const [oid, path] of paths) {
+    let type
+    try {
+      type = execFileSync('git', ['cat-file', '-t', oid], { cwd: root, maxBuffer: GIT_BUFFER }).toString().trim()
+    } catch {
+      continue
+    }
+    if (type !== 'blob') continue
+    let buffer
+    try {
+      buffer = execFileSync('git', ['cat-file', 'blob', oid], { cwd: root, maxBuffer: GIT_BUFFER })
+    } catch {
+      continue
+    }
+    if (!isProbablyText(buffer)) continue
+    findings.push(...scanText(buffer.toString('utf8'), `(history) ${path || oid}`, rules))
+  }
+  return findings
+}
+
+/**
+ * Everything `--history` covers: blob contents plus commit identities.
+ * @param root - repository root.
+ * @returns findings.
+ */
+export function scanHistory(root = ROOT) {
+  return [...scanBlobs(root), ...scanIdentities(root)]
 }
 
 /** Print findings in a `file:line  rule  message` shape and return the exit code. */
@@ -261,9 +351,18 @@ function report(findings, verbose) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = new Set(process.argv.slice(2))
   try {
+    const markers = readMarkers(ROOT)
+    const markersChecked = markers.keywords.length + markers.substrings.length > 0
+    if (!markersChecked) {
+      console.error('check-privacy: note — .privacy-markers is missing, so personal names and hostnames were NOT checked.')
+    }
     const findings = scanRepo(ROOT)
     if (args.has('--history')) findings.push(...scanHistory(ROOT))
-    process.exitCode = report(findings, args.has('--verbose'))
+    const code = report(findings, args.has('--verbose'))
+    if (code === 0 && args.has('--history')) {
+      console.log(`check-privacy: history clean across ${execFileSync('git', ['rev-list', '--all', '--count'], { cwd: ROOT }).toString().trim()} commit(s).`)
+    }
+    process.exitCode = code
   } catch (error) {
     console.error(`check-privacy: scan failed — ${error instanceof Error ? error.message : String(error)}`)
     process.exitCode = 2

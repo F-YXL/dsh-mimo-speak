@@ -39,6 +39,8 @@ yarn-error.log*
 *.p12
 *.crt
 .credentials.yaml
+.npmrc
+.npmrc.*
 *.secret
 
 # ── 编辑器 / 系统 ─────────────────────────────────────

@@ -84,7 +84,7 @@ Then open the app, go to **Plugins → dsh-mimo-speak**, paste your API key, and
 | `autoRead` | `false` | read each newly finalized reply automatically |
 | `readScope` | `smart` | `brief` / `text` / `smart` / `all` |
 | `fallbackEngine` | `none` | `none` or `edge` |
-| `edgeVoice` | Xiaoxiao | any `edge-tts` voice id |
+| `edgeVoice` | `zh-CN-XiaoxiaoNeural` (Xiaoxiao) | any `edge-tts` voice id |
 
 To keep the key out of the profile config, override the row in your profile's `cordis.patch.yml` instead of pasting it:
 
@@ -99,7 +99,11 @@ To keep the key out of the profile config, override the row in your profile's `c
 - The API key is stored through the host credential store (`credentials/set`) and is never written to a repository file, a log line, or the browser.
 - Every `/api/mimo-speak/*` route passes `ctx.connection.requestRejection` first: requests that are not from the app's own trusted origin are rejected before any key is used.
 - Request bodies are capped at 1 MiB; over-budget text is truncated at a sentence boundary rather than refused outright.
-- `npm run check:privacy` scans every tracked file for credentials, personal names and absolute home paths. It runs in CI on every push.
+- `npm run check:privacy` scans every tracked file for credentials, absolute home paths and
+  e-mail addresses, plus any personal names or hostnames you list in the git-ignored
+  `.privacy-markers`. `npm run check:privacy:history` additionally walks **every blob and
+  commit identity in the history** — run it before the first push and before each release,
+  because `git log -p` publishes the past too. CI runs the file scan on every push.
 
 Found a vulnerability? See [SECURITY.md](./SECURITY.md) — please do not open a public issue.
 
