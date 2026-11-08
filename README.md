@@ -5,19 +5,13 @@
 [![dsh](https://img.shields.io/badge/dsh-0.2.2--rc.1-6e56cf)](https://github.com/deepseek-ai/deepseek-harness)
 [![node](https://img.shields.io/badge/node-%3E%3D22.19-339933)](https://nodejs.org)
 
-Read assistant replies aloud inside [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), powered by Xiaomi MiMo TTS.
+Reads assistant replies out loud in [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), using Xiaomi MiMo TTS.
 
-A dsh plugin with three surfaces:
-
-1. a **configuration card** on the Plugins page,
-2. a **speaker button** in the action row of every finalized assistant reply,
-3. an **inline player** with an optional draggable progress bar.
-
-Speech is synthesized by Xiaomi MiMo TTS (`mimo-v2.5-tts`). The API key lives only on the Host; the browser sends text and receives WAV.
+It adds a speaker button to every finalized reply and a settings card on the Plugins page. Click the button and the reply plays through an inline player. The MiMo API key never leaves the host: the browser sends text, the host sends back WAV.
 
 ## Install
 
-**Desktop**: open **Plugins → Add plugin (添加插件)**, enter `github:F-YXL/dsh-mimo-speak`, then restart. Or from the terminal:
+**Desktop**: open Plugins → Add plugin (添加插件), enter `github:F-YXL/dsh-mimo-speak`, restart. Or from a terminal:
 
 ```sh
 dsh plugin --profile desktop add github:F-YXL/dsh-mimo-speak
@@ -29,47 +23,37 @@ dsh plugin --profile desktop add github:F-YXL/dsh-mimo-speak
 dsh plugin --profile web add github:F-YXL/dsh-mimo-speak
 ```
 
-Pin a release instead of following `main` (recommended once `v0.1.0` is tagged):
+Pin a release instead of following `main`:
 
 ```sh
 dsh plugin --profile desktop add 'github:F-YXL/dsh-mimo-speak#v0.1.0'
 ```
 
-No build permission is needed — the package ships a prebuilt `lib/` and declares no install scripts. It also shows up in the in-app **Plugin Market** (Plugins → Discover) once the repository is public: it carries the `dsh-plugin` topic, which the marketplaces index.
+No build permission to grant: the package ships a prebuilt `lib/` and has no install scripts. It also shows up in the in-app plugin market (Plugins → Discover), because the repo carries the `dsh-plugin` topic.
 
-After installing, open **Plugins → dsh-mimo-speak**, paste the MiMo API key and hit **Audition** — a speaker button appears under every finalized reply. Prefer building from source? See [Install from source or tarball](#install-from-source-or-tarball).
+After installing, open Plugins → dsh-mimo-speak, paste the MiMo API key and press Audition. You should hear the sample voice. A speaker button appears under each finalized reply from then on.
 
-Built against **deepseek-harness `0.2.2-rc.1`** (`engines.dsh: ">=0.2.2-rc.1 <0.3.0"`), following the official plugin spec:
+## What it does
 
-| Spec | Where it lands here |
-|---|---|
-| [Packaging & installing plugins](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/user/develop/basic/publish.zh.md) (bundle) | `package.json` declares `dsh.bundle.patch` + `cordis.patch.yml` inserts the `id: mimo-speak` row; the same package carries the `dsh.client` browser half |
-| [Plugin configuration](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/user/develop/basic/config.zh.md) (no hardcoded knobs) | every parameter is a Schemastery Config field with `.volatile()`; the key is `role('secret')` |
-| [Instant config forms](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/cookbook/adding-a-settings-card.zh.md) | `ctx.configForms` (`mimo-speak` namespace) + the standard `SettingsFormModel` form |
-| [Web client slots](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/subsystems/slots.zh.md) | two seats: `plugins.bundle.config` and `conversation.chat.assistant-actions` |
-| [Web server](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/subsystems/web-server.zh.md) | five routes under `/api/mimo-speak/*`, each behind `ctx.connection.requestRejection` (Host/Origin + browser auth), so a bare LAN request cannot spend your API quota |
-| [Client module system](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/modules/README.zh.md) | `lib/client.js` is a lazy-CJS factory (`window.__ModuleLoader__.load`); the build-time purity gate keeps cross-plugin imports type-only |
+The settings card holds the API key (write-only, stored in the host credential store), endpoint, model, one of nine preset voices or a voice-clone sample, default style, character budget and timeout. Audition speaks a sample using the card's current, unsaved edits.
 
-## Features
+Each finalized reply gets a speaker button. Before reading, the plugin strips code blocks, URLs and formatting marks, then plays what is left. The progress bar is off by default; turn it on for a draggable, keyboard-seekable track (←/→, Home/End). Stop means stop: in-flight requests are aborted, queued audio is dropped, and `Esc` does the same.
 
-- **Config card on the Plugins page** — API key (write-only; stored in the host credential store, never echoed back), endpoint base, model, preset voice or a voice-clone sample, default style, character budget, timeout, and an **audition** button that speaks a sample with the card's current unsaved edits.
-- **Speaker button on every finalized reply** — one click normalizes the Markdown (code blocks, URLs and markers are not read) and plays the result.
-- **Progress bar off by default** — turn it on for a draggable, keyboard-seekable track (←/→, Home/End).
-- **Stop really stops** — in-flight requests are aborted, queued audio is dropped, and nothing keeps streaming afterwards. `Esc` does the same.
-- **Four read scopes** — `brief` (summarize with the current conversation model into 1–2 spoken sentences, falling back to a rule-based summary), `text` (prose only), `smart` (prose plus short code), `all`.
-- **Agent tool `mimo-tts-say`** — synthesizes to `<session workspace>/tts/speech-<timestamp>-<random>.wav` and returns the absolute path. It only produces a file; delivering it as a voice message is the chat channel's job.
-- **Edge TTS fallback (optional)** — when MiMo fails and the `edge-tts` CLI is installed, synthesis falls back to Microsoft Edge neural voices.
-- **Bilingual UI** — Chinese and English strings ship in the box.
+Read scopes: `brief` (the conversation model summarizes the reply into a sentence or two first), `text` (prose only), `smart` (prose plus short code), `all`.
+
+There is also an agent tool, `mimo-tts-say`. It synthesizes speech into `<session workspace>/tts/speech-<timestamp>-<random>.wav` and returns the path. It writes a file; sending it as a voice message is up to the chat channel.
+
+If MiMo fails and the `edge-tts` CLI is installed, the plugin can retry with a Microsoft Edge neural voice.
 
 ## Requirements
 
-- DeepSeek Harness `0.2.2-rc.1`
-- Node.js `>= 22.19.0`
-- A MiMo API key from <https://api.xiaomimimo.com> (only needed at runtime, never in this repo)
+- DeepSeek Harness `0.2.2-rc.1` (the package declares `engines.dsh: ">=0.2.2-rc.1 <0.3.0"`)
+- Node.js `>= 22.19`
+- A MiMo API key from https://api.xiaomimimo.com, needed at runtime only
 
 ## Install from source or tarball
 
-From a checkout (the `lib/` commit is prebuilt, so the build step is only needed after you edit `src/`):
+From a checkout. `lib/` is committed prebuilt, so build is only needed after you edit `src/`:
 
 ```sh
 git clone https://github.com/F-YXL/dsh-mimo-speak.git
@@ -85,10 +69,7 @@ npm pack
 dsh plugin --profile <profile> add ./dsh-mimo-speak-0.1.0.tgz
 ```
 
-Then open **Plugins → dsh-mimo-speak**, paste your API key, and hit **Audition** — if you hear speech, the wiring is correct.
-
 ## Configure
-
 | Field | Default | Notes |
 |---|---|---|
 | `apiKeyEnv` | `MIMO_API_KEY` | credential **reference**, not the key itself |
@@ -105,7 +86,7 @@ Then open **Plugins → dsh-mimo-speak**, paste your API key, and hit **Audition
 | `fallbackEngine` | `none` | `none` or `edge` |
 | `edgeVoice` | `zh-CN-XiaoxiaoNeural` (Xiaoxiao) | any `edge-tts` voice id |
 
-To keep the key out of the profile config, override the row in your profile's `cordis.patch.yml` instead of pasting it:
+To keep the key out of the profile config, override the row in your profile's `cordis.patch.yml`:
 
 ```yaml
 - id: mimo-speak
@@ -113,53 +94,58 @@ To keep the key out of the profile config, override the row in your profile's `c
     apiKey: !!js process.env.MIMO_API_KEY
 ```
 
-## Security model
+## Security
 
-- The API key is stored through the host credential store (`credentials/set`) and is never written to a repository file, a log line, or the browser.
-- Every `/api/mimo-speak/*` route passes `ctx.connection.requestRejection` first: requests that are not from the app's own trusted origin are rejected before any key is used.
-- Request bodies are capped at 1 MiB; over-budget text is truncated at a sentence boundary rather than refused outright.
-- `npm run check:privacy` scans every tracked file for credentials, absolute home paths and
-  e-mail addresses, plus any personal names or hostnames you list in the git-ignored
-  `.privacy-markers`. `npm run check:privacy:history` additionally walks **every blob and
-  commit identity in the history** — run it before the first push and before each release,
-  because `git log -p` publishes the past too. CI runs the file scan on every push.
+The API key is written through the host credential store (`credentials/set`) and never ends up in a repo file, a log line or the browser. Every `/api/mimo-speak/*` route passes `ctx.connection.requestRejection` first, so a request from outside the app's trusted origin is refused before any key is used. Request bodies are capped at 1 MiB; overlong text is cut at a sentence boundary.
 
-Found a vulnerability? See [SECURITY.md](./SECURITY.md) — please do not open a public issue.
+`npm run check:privacy` scans every tracked file for credentials, home paths and email addresses, plus names or hostnames you list in the git-ignored `.privacy-markers`. `npm run check:privacy:history` also walks every blob and commit identity in the history, because `git log -p` publishes the past too. CI runs the file scan on every push.
+
+If you find a vulnerability, use [SECURITY.md](./SECURITY.md), not a public issue.
 
 ## Development
 
 ```sh
 npm install
 npm run build            # tsc -> lib/node, tsdown -> lib/client.js
-npm test                 # 62 unit tests (node --test)
+npm test                 # 65 unit tests (node --test)
 node scripts/stub-e2e.mjs        # full HTTP round-trip against a local stub, no key needed
 MIMO_API_KEY=... node scripts/live-e2e.mjs   # one real request against the MiMo platform
 ```
 
-`lib/` **is committed on purpose**: `dsh plugin add` then works without a build step on the user's machine. After changing `src/`, run `npm run build` and commit `lib/` in the same commit — CI fails if the build output is stale.
+`lib/` is committed on purpose, so `dsh plugin add` needs no build step. After editing `src/`, run `npm run build` and commit `lib/` in the same commit; CI fails when the committed build output is stale.
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the commit conventions and the version-pinning workflow, and [MAINTAINING.md](./MAINTAINING.md) for release steps.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for commit conventions and the version-pinning workflow, [MAINTAINING.md](./MAINTAINING.md) for release steps.
 
 ## Pinning to a dsh release
 
-Distribution does **not** pick a matching build per host version: the package pins one set of `@deepseek-ai/dsh-*` dependencies, and npm will not "choose a compatible one for you". Two gates do the real work:
+The package pins one set of `@deepseek-ai/dsh-*` dependencies; npm will not pick a matching build for the host. Two declarations do the gating:
 
-- `dsh.compatibility.dshReleases` — the official field listing the releases this build supports (`{ "0.2.2-rc.1": "compatible" }`). The installer/marketplace refuses or warns when the host version is not on the list.
-- `engines.dsh` — an npm-style range (`>=0.2.2-rc.1 <0.3.0`).
+- `dsh.compatibility.dshReleases` lists the releases this build supports (`{ "0.2.2-rc.1": "compatible" }`). The installer refuses or warns when the host version is not on the list.
+- `engines.dsh` is an npm-style range (`>=0.2.2-rc.1 <0.3.0`).
 
-Two traps worth knowing:
+Two things to watch:
 
-1. Every `@deepseek-ai/dsh-*` package shares one release version (`0.2.2-rc.1`), but `@deepseek-ai/cordis` and `@deepseek-ai/schemastery` are versioned independently (`~4.1.0` / `~3.19.0` at this release). Blanket-bumping everything 404s.
-2. Since `0.2.0`, `dsh-scope` is a peer dependency of `dsh-session` / `dsh-api-remotes` and must appear in both `peerDependencies` and `devDependencies`, or `npm install` fails with `ERESOLVE`.
+1. All `@deepseek-ai/dsh-*` packages share one release version (`0.2.2-rc.1`), but `@deepseek-ai/cordis` and `@deepseek-ai/schemastery` have their own (`~4.1.0` / `~3.19.0` here). Bumping everything together 404s.
+2. Since `0.2.0`, `dsh-scope` is a peer of `dsh-session` / `dsh-api-remotes` and must be in both `peerDependencies` and `devDependencies`, or `npm install` fails with `ERESOLVE`.
 
-Do not hand-edit version numbers — use the script:
+Use the script instead of editing version numbers by hand:
 
 ```sh
 node scripts/pin-dsh-version.mjs <release>            # rewrite package.json, print next steps
 node scripts/pin-dsh-version.mjs <release> --install  # ... and run npm install
-node scripts/pin-dsh-version.mjs <release> --self     # ... and bump this plugin's own version
+node scripts/pin-dsh-version.mjs <release> --self     # ... and bump this plugin's version too
 node scripts/pin-dsh-version.mjs <release> --dry-run  # preview only
 ```
+
+## How it maps to the plugin spec
+| Spec | Where it lands here |
+|---|---|
+| [Packaging & installing plugins](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/user/develop/basic/publish.zh.md) (bundle) | `package.json` declares `dsh.bundle.patch` + `cordis.patch.yml` inserts the `id: mimo-speak` row; the same package carries the `dsh.client` browser half |
+| [Plugin configuration](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/user/develop/basic/config.zh.md) (no hardcoded knobs) | every parameter is a Schemastery Config field with `.volatile()`; the key is `role('secret')` |
+| [Instant config forms](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/cookbook/adding-a-settings-card.zh.md) | `ctx.configForms` (`mimo-speak` namespace) + the standard `SettingsFormModel` form |
+| [Web client slots](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/subsystems/slots.zh.md) | two seats: `plugins.bundle.config` and `conversation.chat.assistant-actions` |
+| [Web server](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/subsystems/web-server.zh.md) | five routes under `/api/mimo-speak/*`, each behind `ctx.connection.requestRejection` (Host/Origin + browser auth), so a bare LAN request cannot spend your API quota |
+| [Client module system](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/modules/README.zh.md) | `lib/client.js` is a lazy-CJS factory (`window.__ModuleLoader__.load`); the build-time purity gate keeps cross-plugin imports type-only |
 
 ## MiMo wire format
 
@@ -280,7 +266,7 @@ dsh-mimo-speak/
 │   ├── wav.ts  normalize.ts# PCM→WAV 封装；Markdown→可朗读文本
 │   ├── settings.ts         # 两侧共享：命名空间/路由/默认值/线格式类型
 │   └── client/             # 浏览器半侧：两个 slot 席位、播放器、配置卡片
-├── tests/                  # 62 项单测（node --test）
+├── tests/                  # 65 项单测（node --test）
 └── scripts/
     ├── stub-e2e.mjs        # 本地桩服务端到端（无需真实密钥）
     ├── live-e2e.mjs        # 真实 MiMo API 端到端（需 MIMO_API_KEY）
@@ -291,7 +277,7 @@ dsh-mimo-speak/
 
 ```sh
 npm install
-npm test                          # 62 项单测
+npm test                          # 65 项单测
 npm run build                     # tsc + tsdown → lib/
 node scripts/stub-e2e.mjs         # 真实 HTTP 桩端到端（96,044 字节 WAV）
 npm run check:privacy             # 隐私扫描，必须 0 命中
