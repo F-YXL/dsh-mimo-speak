@@ -2,14 +2,14 @@
  * Agent tool: text → speech WAV inside the session workspace.
  *
  * The tool only produces a file. Turning it into an actual voice message is the
- * channel's job (on QQ that is `the channel's voice-send tool`), so this plugin stays
- * free of any IM-specific knowledge.
+ * chat channel's job (each channel ships its own voice-send tool), so this
+ * plugin stays free of any IM-specific knowledge.
  *
  * Output goes to `<session cwd>/tts/`: channel-side发送工具通常只接受工作区内的
  * 路径，写到别处（比如本插件的录音目录）会被拒绝。
  * @module dsh-mimo-speak/tool
  */
-/** Tool name: mimo-tts-say.
+/** Tool name: `<vendor>-tts-say`, kept distinct from a chat channel's own voice tools. */
 export declare const SAY_TOOL = "mimo-tts-say";
 /** 合成产物在会话工作区里的子目录。 */
 export declare const SPEECH_DIR = "tts";

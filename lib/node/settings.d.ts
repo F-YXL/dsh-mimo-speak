@@ -58,7 +58,7 @@ export declare const PCM_BYTES_PER_SAMPLE = 2;
 /** Fallback engine selection: no fallback, or Microsoft Edge TTS. */
 export type FallbackEngine = 'none' | 'edge';
 export declare const DEFAULT_FALLBACK_ENGINE: FallbackEngine;
-/** Default Edge-TTS voice (the user's preferred Xiaoxiao). */
+/** Default Edge-TTS voice: Xiaoxiao, the standard mainland-Chinese female voice. */
 export declare const DEFAULT_EDGE_VOICE = "zh-CN-XiaoxiaoNeural";
 /** Read-scope modes: only prose, everything, or prose plus short code. */
 export type ReadScope = 'text' | 'all' | 'smart' | 'brief';

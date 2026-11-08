@@ -2,8 +2,8 @@
  * Agent tool: text → speech WAV inside the session workspace.
  *
  * The tool only produces a file. Turning it into an actual voice message is the
- * channel's job (on QQ that is `the channel's voice-send tool`), so this plugin stays
- * free of any IM-specific knowledge.
+ * chat channel's job (each channel ships its own voice-send tool), so this
+ * plugin stays free of any IM-specific knowledge.
  *
  * Output goes to `<session cwd>/tts/`: channel-side发送工具通常只接受工作区内的
  * 路径，写到别处（比如本插件的录音目录）会被拒绝。
@@ -14,7 +14,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-/** Tool name: mimo-tts-say.
+/** Tool name: `<vendor>-tts-say`, kept distinct from a chat channel's own voice tools. */
 export const SAY_TOOL = 'mimo-tts-say'
 
 /** 合成产物在会话工作区里的子目录。 */
@@ -91,8 +91,7 @@ export function createSayTool(deps: SayToolDeps): {
     description:
       '把一段文字合成语音，写到当前会话工作区的 tts/ 目录，返回 wav 的绝对路径。'
       + '用户要求「用语音回我 / 念出来」，或这段内容本身适合朗读时用它；平时的回复还是用文字，不要每条都合成。'
-      + '它只产出文件——要让用户真的听到，得把返回的 path 交给当前聊天渠道的发语音工具'
-      + '（QQ 通道上是 the channel's voice-send tool）。',
+      + '它只产出文件——要让用户真的听到，得把返回的 path 交给当前聊天渠道的发语音工具。',
     parameters: {
       type: 'object',
       additionalProperties: false,

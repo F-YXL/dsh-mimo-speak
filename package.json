@@ -3,6 +3,26 @@
   "version": "0.1.0",
   "description": "MiMo TTS speech for DeepSeek Harness: select a preset voice on the Plugins-page card, read any assistant reply aloud, and optionally auto-read each new reply with the configured voice and style",
   "icon": "./icon.svg",
+  "license": "MIT",
+  "author": "F-YXL",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/F-YXL/dsh-mimo-speak.git"
+  },
+  "homepage": "https://github.com/F-YXL/dsh-mimo-speak#readme",
+  "bugs": {
+    "url": "https://github.com/F-YXL/dsh-mimo-speak/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "text-to-speech",
+    "tts",
+    "mimo",
+    "xiaomi",
+    "speech-synthesis",
+    "accessibility"
+  ],
   "type": "module",
   "main": "./lib/node/index.js",
   "types": "./lib/node/index.d.ts",
@@ -29,7 +49,9 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && tsdown",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "check:privacy": "node scripts/check-privacy.mjs",
+    "check:privacy:history": "node scripts/check-privacy.mjs --history"
   },
   "dsh": {
     "manifestVersion": 1,
@@ -95,6 +117,5 @@
     "react-dom": "^18.2.0",
     "tsdown": "^0.22.2",
     "typescript": "^6.0.3"
-  },
-  "license": "MIT"
+  }
 }

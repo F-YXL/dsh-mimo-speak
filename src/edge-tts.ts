@@ -14,6 +14,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import { DEFAULT_EDGE_VOICE } from './settings.ts'
 import { TtsError } from './tts.ts'
 
 const execFileAsync = promisify(execFile)
@@ -36,9 +37,9 @@ const CANDIDATE_BINARIES = [
 /** Resolved CLI path, cached: probing spawns a process, so do it once. */
 let located: string | null = null
 
-/** Resolve an Edge voice, defaulting to the user's preferred Xiaoxiao. */
+/** Resolve an Edge voice, defaulting to {@link DEFAULT_EDGE_VOICE}. */
 export function resolveEdgeVoice(voice: string | undefined): string {
-  return (voice ?? '').trim() || 'zh-CN-XiaoxiaoNeural'
+  return (voice ?? '').trim() || DEFAULT_EDGE_VOICE
 }
 
 /** Find the first `edge-tts` binary the shell would actually run. */

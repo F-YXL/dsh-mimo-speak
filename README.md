@@ -1,54 +1,241 @@
-# dsh-mimo-speak — MiMo TTS 语音合成插件（DeepSeek Harness 0.2.2-rc.1）
+# dsh-mimo-speak
 
-把助手回复"读出来"的 DSH 插件：**"插件"页里的配置卡片** + **每条已定稿助手回复动作行里的音量按钮** + **带可拖动进度条的内联播放器**。语音由小米 MiMo TTS（`mimo-v2.5-tts`）合成，API Key 只存在于宿主侧，浏览器只发送文本、收到 WAV。
+[![CI](https://github.com/F-YXL/dsh-mimo-speak/actions/workflows/ci.yml/badge.svg)](https://github.com/F-YXL/dsh-mimo-speak/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![dsh](https://img.shields.io/badge/dsh-0.2.2--rc.1-6e56cf)](https://github.com/deepseek-ai/deepseek-harness)
+[![node](https://img.shields.io/badge/node-%3E%3D22.19-339933)](https://nodejs.org)
 
-面向 **deepseek-harness `0.2.2-rc.1`**（`engines.dsh: ">=0.2.2-rc.1 <0.3.0"`），完全按照官方插件规范实现：
+Read assistant replies aloud inside [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), powered by Xiaomi MiMo TTS.
 
-| 官方规范条目 | 本插件的落点 |
+A dsh plugin with three surfaces:
+
+1. a **configuration card** on the Plugins page,
+2. a **speaker button** in the action row of every finalized assistant reply,
+3. an **inline player** with an optional draggable progress bar.
+
+Speech is synthesized by Xiaomi MiMo TTS (`mimo-v2.5-tts`). The API key lives only on the Host; the browser sends text and receives WAV.
+
+Built against **deepseek-harness `0.2.2-rc.1`** (`engines.dsh: ">=0.2.2-rc.1 <0.3.0"`), following the official plugin spec:
+
+| Spec | Where it lands here |
 |---|---|
-| [打包与安装插件](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/user/develop/basic/publish.zh.md)（bundle 组合包） | `package.json` 声明 `dsh.bundle.patch` + `cordis.patch.yml` 插入 `id: mimo-speak` 行；同包携带 `dsh.client` 浏览器半侧（裸包名行同时挂载 Host/Client 两侧） |
-| [插件配置](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/user/develop/basic/config.zh.md)（无硬编码可调参数） | 全部参数走 Schemastery Config + `.volatile()`（接口地址/模型/音色/克隆样本/风格/字数/超时均可配）；密钥 `role('secret')` |
-| [即时配置表单](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/cookbook/adding-a-settings-card.zh.md) | `ctx.configForms`（`mimo-speak` 命名空间）+ `SettingsFormModel` 标准表单；`ctx.settings.configure({ auto: false })` 关闭自动页策略，配置卡片自己注册进官方 `plugins.bundle.config`（key = npm 包名） |
-| [Web Client Slots](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/subsystems/slots.zh.md) | `plugins.bundle.config`（插件页配置卡）+ `conversation.chat.assistant-actions`（消息动作行）两个席位，`ctx.slots.inject` 贡献、effect 生命周期托管；跨插件只 `import type` 取 slot 声明 |
-| [Web Server 子系统](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/subsystems/web-server.zh.md) | `ctx.webServer.register` 挂 `/api/mimo-speak/status`、`/synthesize`、`/synthesize-stream`、`/test`、`/summary` 五条路由，入口先过 `ctx.connection.requestRejection` 信任栅栏（Host/Origin + 浏览器鉴权），LAN 裸请求无法白嫖 API 额度 |
-| [客户端模块系统](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/modules/README.zh.md) | `lib/client.js` 为 lazy-CJS factory（`window.__ModuleLoader__.load({ id, factory })`），外部仅平台模块（react / cordis / client-store / ui-primitives），跨插件只经 Cordis 服务与 `import type`（构建期 purity gate 强制） |
-| [extension-cookbook · UI 插件](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/cookbook/extension-cookbook.zh.md) | 业务数据不进组件 props 面：文本经 `useChat` 从 Conversation binding 派生，配置经 `configForms`，合成经宿主路由，文案经 `ctx.locale`（zh/en 双语） |
+| [Packaging & installing plugins](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/user/develop/basic/publish.zh.md) (bundle) | `package.json` declares `dsh.bundle.patch` + `cordis.patch.yml` inserts the `id: mimo-speak` row; the same package carries the `dsh.client` browser half |
+| [Plugin configuration](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/user/develop/basic/config.zh.md) (no hardcoded knobs) | every parameter is a Schemastery Config field with `.volatile()`; the key is `role('secret')` |
+| [Instant config forms](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/cookbook/adding-a-settings-card.zh.md) | `ctx.configForms` (`mimo-speak` namespace) + the standard `SettingsFormModel` form |
+| [Web client slots](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/subsystems/slots.zh.md) | two seats: `plugins.bundle.config` and `conversation.chat.assistant-actions` |
+| [Web server](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/docs/subsystems/web-server.zh.md) | five routes under `/api/mimo-speak/*`, each behind `ctx.connection.requestRejection` (Host/Origin + browser auth), so a bare LAN request cannot spend your API quota |
+| [Client module system](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/client/modules/README.zh.md) | `lib/client.js` is a lazy-CJS factory (`window.__ModuleLoader__.load`); the build-time purity gate keeps cross-plugin imports type-only |
+
+## Features
+
+- **Config card on the Plugins page** — API key (write-only; stored in the host credential store, never echoed back), endpoint base, model, preset voice or a voice-clone sample, default style, character budget, timeout, and an **audition** button that speaks a sample with the card's current unsaved edits.
+- **Speaker button on every finalized reply** — one click normalizes the Markdown (code blocks, URLs and markers are not read) and plays the result.
+- **Progress bar off by default** — turn it on for a draggable, keyboard-seekable track (←/→, Home/End).
+- **Stop really stops** — in-flight requests are aborted, queued audio is dropped, and nothing keeps streaming afterwards. `Esc` does the same.
+- **Four read scopes** — `brief` (summarize with the current conversation model into 1–2 spoken sentences, falling back to a rule-based summary), `text` (prose only), `smart` (prose plus short code), `all`.
+- **Agent tool `mimo-tts-say`** — synthesizes to `<session workspace>/tts/speech-<timestamp>-<random>.wav` and returns the absolute path. It only produces a file; delivering it as a voice message is the chat channel's job.
+- **Edge TTS fallback (optional)** — when MiMo fails and the `edge-tts` CLI is installed, synthesis falls back to Microsoft Edge neural voices.
+- **Bilingual UI** — Chinese and English strings ship in the box.
+
+## Requirements
+
+- DeepSeek Harness `0.2.2-rc.1`
+- Node.js `>= 22.19.0`
+- A MiMo API key from <https://api.xiaomimimo.com> (only needed at runtime, never in this repo)
+
+## Install
+
+From a checkout:
+
+```sh
+git clone https://github.com/F-YXL/dsh-mimo-speak.git
+cd dsh-mimo-speak
+npm install
+npm run build          # regenerates lib/ from src/
+dsh plugin --profile <profile> add ./dsh-mimo-speak
+dsh --profile <profile> --dump-config | grep mimo-speak   # expect a "# == dsh-mimo-speak" layer
+dsh --profile <profile>
+```
+
+From a packed tarball:
+
+```sh
+npm pack
+dsh plugin --profile <profile> add ./dsh-mimo-speak-0.1.0.tgz
+```
+
+> pnpm 10 and later need build permission for git/local installs: add `dsh-mimo-speak` to that profile's `pnpm-workspace.yaml` under `allowBuilds`, then retry.
+
+Then open the app, go to **Plugins → dsh-mimo-speak**, paste your API key, and hit **Audition** — if you hear speech, the wiring is correct. A speaker button now appears under each finalized reply.
+
+## Configure
+
+| Field | Default | Notes |
+|---|---|---|
+| `apiKeyEnv` | `MIMO_API_KEY` | credential **reference**, not the key itself |
+| `baseUrl` | `https://api.xiaomimimo.com/v1` | `/chat/completions` is appended |
+| `model` | `mimo-v2.5-tts` | switches to `mimo-v2.5-tts-voiceclone` automatically when a clone sample is set |
+| `voice` | `mimo_default` | preset: `mimo_default`, 冰糖, 茉莉, 苏打, 白桦, Mia, Chloe, Milo, Dean |
+| `voiceSamplePath` | — | host-local WAV, 24 kHz / 16-bit / mono, 5–15 s |
+| `style` | — | e.g. `开心`, `语速慢`, `东北话`; empty lets the model decide |
+| `maxChars` | `2000` | longer text is clamped at a sentence boundary |
+| `chunkChars` | `120` | size of one playback chunk |
+| `timeoutMs` | `60000` | |
+| `autoRead` | `false` | read each newly finalized reply automatically |
+| `readScope` | `smart` | `brief` / `text` / `smart` / `all` |
+| `fallbackEngine` | `none` | `none` or `edge` |
+| `edgeVoice` | Xiaoxiao | any `edge-tts` voice id |
+
+To keep the key out of the profile config, override the row in your profile's `cordis.patch.yml` instead of pasting it:
+
+```yaml
+- id: mimo-speak
+  config:
+    apiKey: !!js process.env.MIMO_API_KEY
+```
+
+## Security model
+
+- The API key is stored through the host credential store (`credentials/set`) and is never written to a repository file, a log line, or the browser.
+- Every `/api/mimo-speak/*` route passes `ctx.connection.requestRejection` first: requests that are not from the app's own trusted origin are rejected before any key is used.
+- Request bodies are capped at 1 MiB; over-budget text is truncated at a sentence boundary rather than refused outright.
+- `npm run check:privacy` scans every tracked file for credentials, personal names and absolute home paths. It runs in CI on every push.
+
+Found a vulnerability? See [SECURITY.md](./SECURITY.md) — please do not open a public issue.
+
+## Development
+
+```sh
+npm install
+npm run build            # tsc -> lib/node, tsdown -> lib/client.js
+npm test                 # 44 unit tests (node --test)
+node scripts/stub-e2e.mjs        # full HTTP round-trip against a local stub, no key needed
+MIMO_API_KEY=... node scripts/live-e2e.mjs   # one real request against the MiMo platform
+```
+
+`lib/` **is committed on purpose**: `dsh plugin add` then works without a build step on the user's machine. After changing `src/`, run `npm run build` and commit `lib/` in the same commit — CI fails if the build output is stale.
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the commit conventions and the version-pinning workflow, and [MAINTAINING.md](./MAINTAINING.md) for release steps.
+
+## Pinning to a dsh release
+
+Distribution does **not** pick a matching build per host version: the package pins one set of `@deepseek-ai/dsh-*` dependencies, and npm will not "choose a compatible one for you". Two gates do the real work:
+
+- `dsh.compatibility.dshReleases` — the official field listing the releases this build supports (`{ "0.2.2-rc.1": "compatible" }`). The installer/marketplace refuses or warns when the host version is not on the list.
+- `engines.dsh` — an npm-style range (`>=0.2.2-rc.1 <0.3.0`).
+
+Two traps worth knowing:
+
+1. Every `@deepseek-ai/dsh-*` package shares one release version (`0.2.2-rc.1`), but `@deepseek-ai/cordis` and `@deepseek-ai/schemastery` are versioned independently (`~4.1.0` / `~3.19.0` at this release). Blanket-bumping everything 404s.
+2. Since `0.2.0`, `dsh-scope` is a peer dependency of `dsh-session` / `dsh-api-remotes` and must appear in both `peerDependencies` and `devDependencies`, or `npm install` fails with `ERESOLVE`.
+
+Do not hand-edit version numbers — use the script:
+
+```sh
+node scripts/pin-dsh-version.mjs <release>            # rewrite package.json, print next steps
+node scripts/pin-dsh-version.mjs <release> --install  # ... and run npm install
+node scripts/pin-dsh-version.mjs <release> --self     # ... and bump this plugin's own version
+node scripts/pin-dsh-version.mjs <release> --dry-run  # preview only
+```
+
+## MiMo wire format
+
+`POST {baseUrl}/chat/completions`, header `api-key: <key>`, body:
+
+```json
+{
+  "model": "mimo-v2.5-tts",
+  "audio": { "format": "wav", "voice": "mimo_default" },
+  "messages": [{ "role": "assistant", "content": "<style>开心</style>要说的话" }]
+}
+```
+
+Voice cloning switches to `mimo-v2.5-tts-voiceclone` and puts the reference audio in `audio.voice` as a data URI:
+
+```json
+{
+  "model": "mimo-v2.5-tts-voiceclone",
+  "audio": { "format": "wav", "voice": "data:audio/wav;base64,<base64 wav>" },
+  "messages": [{ "role": "assistant", "content": "要说的话" }]
+}
+```
+
+The response carries base64 audio in `choices[0].message.audio.data` — either a RIFF container (passed through) or raw PCM (wrapped into a 24 kHz / 16-bit / mono WAV by the plugin).
+
+## Known limits
+
+- Reading is **per message**: the action row belongs to one finalized reply, so reasoning blocks and tool calls are not read. Code blocks become "代码略".
+- Text longer than `maxChars` is read from the start and cut at a sentence boundary, with a hint next to the action row.
+- Desktop (Electron) goes through the IPC fetch bridge; the route paths are unchanged.
+- Voice **input** is the official `@deepseek-ai/dsh-experimental-voice-input-bundle`, not this plugin. This one stops speaking as soon as the microphone opens, so the two do not feed back into each other.
+
+## License
+
+[MIT](./LICENSE) © F-YXL. Commercial use is permitted — that is what MIT means.
+
+---
+
+<details>
+<summary>中文说明（完整）</summary>
+
+## 这是什么
+
+把助手回复「读出来」的 DSH 插件：**「插件」页里的配置卡片** + **每条已定稿助手回复动作行里的音量按钮** + **带可拖动进度条的内联播放器**。语音由小米 MiMo TTS（`mimo-v2.5-tts`）合成，API Key 只存在于宿主侧，浏览器只发送文本、收到 WAV。
+
+面向 **deepseek-harness `0.2.2-rc.1`**（`engines.dsh: ">=0.2.2-rc.1 <0.3.0"`）。
 
 ## 功能
 
-1. **「插件」页 → dsh-mimo-speak 详情页的配置卡片**（官方 `plugins.bundle.config` 席位，key = 包名）
-   - API Key（只写输入框：粘贴即经官方 `credentials/set` 通道存入宿主凭据存储，页面不回显；显示"已配置/未配置"，清空保存不改动已存密钥）
+1. **「插件」页 → dsh-mimo-speak 详情页的配置卡片**
+   - API Key（只写输入框：粘贴即经官方 `credentials/set` 通道存入宿主凭据存储，页面不回显；显示「已配置/未配置」，清空保存不改动已存密钥）
    - 接口地址（默认 `https://api.xiaomimimo.com/v1`）、模型（默认 `mimo-v2.5-tts`）
-   - 预置音色（**官方 9 音色下拉**：mimo_default、冰糖、茉莉、苏打、白桦、Mia、Chloe、Milo、Dean）/ 音色克隆样本（宿主本地 WAV 路径，24kHz/16bit/单声道，5–15s）
-   - 默认风格（如"开心""语速慢""东北话"；留空由模型自行判断，推荐）、单次最大字符数、请求超时
+   - 预置音色（官方 9 音色下拉：mimo_default、冰糖、茉莉、苏打、白桦、Mia、Chloe、Milo、Dean）/ 音色克隆样本（宿主本地 WAV 路径，24 kHz / 16 bit / 单声道，5–15 s）
+   - 默认风格（如「开心」「语速慢」「东北话」；留空由模型自行判断，推荐）、单次最大字符数、请求超时
    - **试听**：用卡片当前（含未保存修改）的风格/音色合成一句示例，内联播放
-   - 标准表单行为：脏值预览、"已覆盖/恢复默认"徽标、保存/放弃、只读部署提示
-2. **每条已定稿助手回复底部的音量按钮**（位于该消息动作行，复制/分支之间）
+   - 标准表单行为：脏值预览、「已覆盖/恢复默认」徽标、保存/放弃、只读部署提示
+2. **每条已定稿助手回复底部的音量按钮**
    - 点击 → 宿主合成（Markdown 归一化：不朗读代码块/URL/标记符号）→ 自动播放
-   - **进度条可关（默认关）**：关掉只留播放/停止按钮，不弹任何浮层；打开才有可拖动进度条（pointer 拖拽、单击定位、键盘 ←→/Home/End）
-   - **停止是真取消**：中断在途请求、作废本轮、清空已排程音频——后续句子不会再合成、不会再"流"出来；Esc 同样生效
+   - **进度条可关（默认关）**：关掉只留播放/停止按钮；打开才有可拖动进度条（指针拖拽、单击定位、键盘 ←→/Home/End）
+   - **停止是真取消**：中断在途请求、作废本轮、清空已排程音频；`Esc` 同样生效
    - 同时只有一条在播；播放中动作行不再悬停淡出
    - 失败就地提示（未配置/超时/上游拒绝/无文本等稳定错误码 → 本地化文案）
-3. **朗读范围四档**：简要播报（**先摘要再念**：用当前对话模型把回复浓缩成 1–2 句口播摘要，约 80 字；模型不可用时退回规则摘要——每段第一句、上限 6 句/260 字）/ 只读正文 / 智能（正文+短代码）/ 全部
-4. **Agent 工具 `mimo-tts-say`**（`tools` 服务在的组合里注册）
+3. **朗读范围四档**：简要播报（先摘要再念：用当前对话模型把回复浓缩成 1–2 句口播摘要，约 80 字；模型不可用时退回规则摘要）/ 只读正文 / 智能（正文+短代码）/ 全部
+4. **Agent 工具 `mimo-tts-say`**
    - 参数：`text`（必填）、`voice`、`style`（可选覆盖）
    - 行为：合成 → 写 `<会话工作区>/tts/speech-<时间戳>-<8位随机>.wav` → 返回绝对路径 + 字节数 + 时长
-   - **只产出文件，不发消息**：要真的发出去，把返回的 path 交给聊天渠道的发语音工具（QQ 通道是 `the channel's voice-send tool`）
-   - 为什么写进工作区：渠道侧的发送工具通常只接受工作区内的路径，写到录音目录会被拒
-   - 工具描述里写清了「用户要求语音回复、或内容适合朗读时才用」，平时的回复还是文字
-5. **安全边界**：密钥只在宿主；`/api/mimo-speak/*` 路由先过 Connection 信任栅栏；请求体 1MiB 上限；文本超预算在句末截断朗读开头。工具和网页朗读共用同一套 settings/凭据，不额外存密钥。
+   - **只产出文件，不发消息**：要真的发出去，把返回的 path 交给当前聊天渠道自己的发语音工具
+   - 为什么写进工作区：渠道侧的发送工具通常只接受工作区内的路径
+5. **安全边界**：密钥只在宿主；`/api/mimo-speak/*` 路由先过 Connection 信任栅栏；请求体 1 MiB 上限；文本超预算在句末截断朗读开头。工具和网页朗读共用同一套 settings/凭据，不额外存密钥。
+
+## 安装
+
+```sh
+git clone https://github.com/F-YXL/dsh-mimo-speak.git
+cd dsh-mimo-speak
+npm install && npm run build
+dsh plugin --profile <profile> add ./dsh-mimo-speak
+```
+
+pnpm ≥ 10 首次 git/本地源码安装需要为构建授权：把 `dsh-mimo-speak` 写入该 profile 的 `pnpm-workspace.yaml` → `allowBuilds: { dsh-mimo-speak: true }`，再重试。
+
+不想把密钥写进配置文件时，在 profile 的 `cordis.patch.yml` 里覆写该行：
+
+```yaml
+- id: mimo-speak
+  config:
+    apiKey: !!js process.env.MIMO_API_KEY
+```
 
 ## 与官方语音输入插件配合
 
 语音指令的识别交给官方组合包，本插件只负责播报，两者互补：
 
 ```bash
-# 版本要与宿主对齐：DSH 0.2.2-rc.1 → 钉到同版本（@next 会随宿主前进，装出跨版本 bundle）
-dsh plugin --profile desktop add @deepseek-ai/dsh-experimental-voice-input-bundle@0.2.2-rc.1
+# 版本要与宿主对齐：DSH 0.2.2-rc.1 → 钉到同版本
+dsh plugin --profile <profile> add @deepseek-ai/dsh-experimental-voice-input-bundle@0.2.2-rc.1
 ```
 
-它是本地 SenseVoice 转写（首次使用下载运行时），识别结果插入输入框草稿，不会自动发送。
-本插件检测到麦克风被打开时会立即停止朗读，所以「说完 → 发送 → 自动朗读回复」这条链路不会把播报录进去。
+它是本地 SenseVoice 转写（首次使用下载运行时），识别结果插入输入框草稿，不会自动发送。本插件检测到麦克风被打开时会立即停止朗读，所以「说完 → 发送 → 自动朗读回复」这条链路不会把播报录进去。
 
 ## 目录
 
@@ -64,108 +251,60 @@ dsh-mimo-speak/
 │   ├── tts.ts              # MiMo TTS 客户端（/chat/completions + audio 输出块）
 │   ├── wav.ts  normalize.ts# PCM→WAV 封装；Markdown→可朗读文本
 │   ├── settings.ts         # 两侧共享：命名空间/路由/默认值/线格式类型
-│   └── client/
-│       ├── index.ts        # 浏览器插件：两个 slot 席位注册
-│       ├── SpeakAction.tsx # 消息动作行的音量按钮 + 浮层播放器
-│       ├── PlayerBar.tsx   # 可拖动进度条（role=slider，指针+键盘）
-│       ├── BundleConfigCard.tsx + settings-controller.ts  # 插件页配置卡片
-│       ├── chat-text.ts    # 从 Chat snapshot 取该消息的可朗读文本
-│       ├── use-audio-player.ts  # 播放引擎（单活播放器）
-│       ├── api.ts  status.ts  slots.ts  locales.ts  styles.ts  SpeakerIcon.tsx
-├── tests/                  # 43 项单测（node --test）
+│   └── client/             # 浏览器半侧：两个 slot 席位、播放器、配置卡片
+├── tests/                  # 44 项单测（node --test）
 └── scripts/
     ├── stub-e2e.mjs        # 本地桩服务端到端（无需真实密钥）
-    └── live-e2e.mjs        # 真实 MiMo API 端到端（需 MIMO_API_KEY）
+    ├── live-e2e.mjs        # 真实 MiMo API 端到端（需 MIMO_API_KEY）
+    └── check-privacy.mjs   # 推送前的隐私扫描
 ```
 
-## 构建与安装
+## 构建与测试
 
 ```sh
-npm install          # 装依赖（无 prepare 钩子，需手动构建）
-npm test             # 43 项单测
-node scripts/stub-e2e.mjs
-```
-
-安装进 DSH profile（源码 checkout）：
-
-```sh
-dsh plugin --profile demo add ./dsh-mimo-speak
-# pnpm≥10 首次 git/本地源码安装需要为构建授权：把 dsh-mimo-speak 写入
-# 该 profile 的 pnpm-workspace.yaml → allowBuilds: { dsh-mimo-speak: true }，再重试
-dsh --profile demo --dump-config   # 应能看到 "# == dsh-mimo-speak" 层
-dsh --profile demo
-```
-
-打开 `http://127.0.0.1:3080`：**「插件」页 → dsh-mimo-speak 卡片**里填入 API Key（试听可即时验证），随后每条已定稿回复下都会出现音量按钮。
-
-不想把密钥写进配置文件时，在 profile 的 `cordis.patch.yml` 里覆写该行：
-
-```yaml
-- id: mimo-speak
-  config:
-    apiKey: !!js process.env.MIMO_API_KEY
+npm install
+npm test                          # 44 项单测
+npm run build                     # tsc + tsdown → lib/
+node scripts/stub-e2e.mjs         # 真实 HTTP 桩端到端（96,044 字节 WAV）
+npm run check:privacy             # 隐私扫描，必须 0 命中
 ```
 
 ## 适配版本与「按版本选适配」
 
-**分发不会按宿主版本自动下载对应适配版本。** 本插件打包时把 `@deepseek-ai/dsh-*` 依赖锁死在某一个 release（当前 0.2.2-rc.1），别人拉到的就是同一份 `package.json`；npm 不会"看对方 dsh 版本 → 选不同版本的 dsh-* 依赖"。真正的版本闸门是 dsh 的两处兼容性声明：
+**分发不会按宿主版本自动下载对应适配版本。** 本插件打包时把 `@deepseek-ai/dsh-*` 依赖锁死在某一个 release（当前 0.2.2-rc.1），别人拉到的就是同一份 `package.json`。真正的版本闸门是两处兼容性声明：
 
-- `dsh.compatibility.dshReleases`：官方字段，精确列出本包适配的 release（如 `{ "0.2.2-rc.1": "compatible" }`）。安装器/市场在对方 dsh 版本不在白名单时**拒绝或警告**，而不是自动换一个适配版本。
-- `engines.dsh`：npm 风格的范围闸门（当前 `>=0.2.2-rc.1 <0.3.0`），语义与上面互补。
+- `dsh.compatibility.dshReleases`：官方字段，精确列出本包适配的 release。安装器/市场在对方 dsh 版本不在白名单时**拒绝或警告**。
+- `engines.dsh`：npm 风格的范围闸门（当前 `>=0.2.2-rc.1 <0.3.0`）。
 
-运行时实际用的 `@deepseek-ai/dsh-*` 实例由**宿主 dsh 自带**（客户端半从平台模块表取 cordis/store/slots/primitives，Host 半由 Node 按宿主 `node_modules` 解析），插件代码只是复用宿主环境里的版本——只要代码用的 API 在该 dsh 版本里存在即可。想让 0.1.7 的 dsh 也能用，得单独发一份 pin 回 0.1.7-rc.2 的包（下方脚本一键生成），即"多版本并行发布"，用户按自己的 dsh 版本装对应那份。
+运行时实际用的 `@deepseek-ai/dsh-*` 实例由**宿主 dsh 自带**，插件代码只是复用宿主环境里的版本。想让旧版 dsh 也能用，得单独发一份 pin 回旧版本的包（`scripts/pin-dsh-version.mjs` 一键生成），即「多版本并行发布」。
 
-本插件跟随 deepseek-harness 的 release，但 dsh 的包版本规则有两点容易踩坑：
+三个容易踩的坑：
 
-1. **`@deepseek-ai/dsh-*` 整条线共用同一个 release 版本号**（0.2.2-rc.1 的所有 dsh-* 包都标 0.2.2-rc.1）。
-2. **`@deepseek-ai/cordis` 与 `@deepseek-ai/schemastery` 是独立版本号，不跟随 release**（0.2.2-rc.1 时代是 cordis `~4.1.0`、schemastery `~3.19.0`），无脑把全部依赖改成同一个 release 会 404。
-3. **`0.2.0` 起 `dsh-scope` 成为 peer 依赖**：`dsh-session` / `dsh-api-remotes` 把 `@deepseek-ai/dsh-scope` 列为 peer，需与 cordis 一样同时写在 `peerDependencies` 与 `devDependencies` 里，否则 `npm install` 报 ERESOLVE。
+1. `@deepseek-ai/dsh-*` 整条线共用同一个 release 版本号。
+2. `@deepseek-ai/cordis` 与 `@deepseek-ai/schemastery` 是独立版本号，不跟随 release。
+3. `0.2.0` 起 `dsh-scope` 成为 peer 依赖，需同时写在 `peerDependencies` 与 `devDependencies` 里，否则 `npm install` 报 `ERESOLVE`。
 
-要把插件重新对准另一个 dsh release，**不要手改版本号**，用脚本：
+## MiMo 线格式
 
-```sh
-node scripts/pin-dsh-version.mjs <release>            # 改 package.json（dsh-* + engines.dsh）并打印后续步骤
-node scripts/pin-dsh-version.mjs <release> --install  # 改完顺手跑 npm install
-node scripts/pin-dsh-version.mjs <release> --self     # 顺便把插件自身 version 也改成 release
-node scripts/pin-dsh-version.mjs <release> --dry-run  # 只预览不写文件
+```
+POST {baseUrl}/chat/completions
+头：api-key: <key>
+体：{ "model": "mimo-v2.5-tts",
+      "audio": { "format": "wav", "voice": "mimo_default" },
+      "messages": [{ "role": "assistant", "content": "<style>开心</style>要说的话" }] }
 ```
 
-脚本会自动：把 `@deepseek-ai/dsh-*`（含 dsh-scope）在 `peer` / `dev` 两处改到目标 release；把 `engines.dsh` 推进到 `>=<release> <次版本+1>.0`；把 `dsh.compatibility.dshReleases` 同步写成 `{ "<release>": "compatible" }`；并去 npm 查该 release 配套的 `cordis` / `schemastery` 区间（也可用 `--cordis=...` / `--schemastery=...` 手动指定，跳过网络）。改完 `package.json` 后跑 `npm install` 让 `node_modules` / `package-lock.json` 跟上，再 `npm run build && npm test`。
-
-## MiMo TTS 线格式（与 `mimo-tts-wav` skill 完全一致）
-
-`POST {baseUrl}/chat/completions`，头 `api-key: <key>`，体：
-
-```json
-{
-  "model": "mimo-v2.5-tts",
-  "audio": { "format": "wav", "voice": "mimo_default" },
-  "messages": [{ "role": "assistant", "content": "<style>开心</style>要说的话" }]
-}
-```
-
-音色克隆时切到 `mimo-v2.5-tts-voiceclone` 模型，参考音频以 Data URI 放进 `audio.voice`：
-
-```json
-{
-  "model": "mimo-v2.5-tts-voiceclone",
-  "audio": { "format": "wav", "voice": "data:audio/wav;base64,<base64 wav>" },
-  "messages": [{ "role": "assistant", "content": "要说的话" }]
-}
-```
-
-响应 `choices[0].message.audio.data` 为 base64 音频（RIFF 或裸 PCM，裸 PCM 由插件包成 24kHz/16bit/mono WAV）。
+音色克隆时切到 `mimo-v2.5-tts-voiceclone` 模型，参考音频以 Data URI 放进 `audio.voice`。响应 `choices[0].message.audio.data` 为 base64 音频（RIFF 或裸 PCM，裸 PCM 由插件包成 24 kHz / 16 bit / mono WAV）。
 
 ## 已知边界
 
-- 按**消息**朗读：动作行属于该条已定稿回复，朗读其正文（不读思考块与工具调用）；代码块以"代码略"代替。
-- 文本超过"单次最大字符数"时朗读开头并在句末截断（动作行旁有提示）。
+- 按**消息**朗读：动作行属于该条已定稿回复，朗读其正文（不读思考块与工具调用）；代码块以「代码略」代替。
+- 文本超过「单次最大字符数」时朗读开头并在句末截断。
 - Desktop（Electron）走 IPC 桥接 fetch，路由路径不变。
-- 语音输入（麦克风）是官方 `@deepseek-ai/dsh-experimental-voice-input-bundle` 的职责，本插件不重复实现；开麦时本插件自动停止朗读（可在设置里关），避免把自己的播报声录成新的输入。
+- 语音输入（麦克风）是官方 `@deepseek-ai/dsh-experimental-voice-input-bundle` 的职责，本插件不重复实现。
 
-## 验证记录
+## 许可证
 
-- `tsc` 全量类型检查通过（对着 0.2.2-rc.1 的真实 .d.ts）
-- `node --test`：43/43 通过（请求形状/PCM 封装/Markdown 归一化/文本提取/错误码映射）
-- `scripts/stub-e2e.mjs`：真实 HTTP 桩端到端通过（96,044 字节 WAV）
-- MiMo 实机协议探测通过（与官方 `mimo-tts-wav` skill 同一契约，115,244 字节 WAV）；`scripts/live-e2e.mjs` 可对真实 API 跑完整引擎链路
+[MIT](./LICENSE) © F-YXL。**MIT 允许商用**——这是它和「禁止商用」许可证的关键区别；如果你需要禁止商用，请自行更换为 PolyForm Noncommercial 等非开源许可证。
+
+</details>

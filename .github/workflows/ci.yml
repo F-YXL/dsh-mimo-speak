@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Committed build output matches source
+        run: |
+          if ! git diff --quiet -- lib/; then
+            echo "::error::lib/ is stale — run 'npm run build' and commit the result."
+            git --no-pager diff --stat -- lib/
+            exit 1
+          fi
+
+      - name: Unit tests
+        run: npm test
+
+      - name: End-to-end against the local stub
+        run: node scripts/stub-e2e.mjs
+
+      - name: Privacy scan
+        run: npm run check:privacy

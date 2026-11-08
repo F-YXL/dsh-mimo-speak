@@ -1,0 +1,81 @@
+name: Bug report
+description: Something is broken — the card does not save, the button does not speak, the audio is wrong.
+title: '[bug] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please **do not paste your API key** or any log line containing it.
+        Security problems go to [SECURITY.md](https://github.com/F-YXL/dsh-mimo-speak/blob/main/SECURITY.md), not here.
+  - type: input
+    id: plugin-version
+    attributes:
+      label: dsh-mimo-speak version
+      description: From `package.json`, or the version shown on the plugin card.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: dsh-version
+    attributes:
+      label: DeepSeek Harness version
+      placeholder: 0.2.2-rc.1
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS and Node version
+      placeholder: macOS 15 / node 22.19.0
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Plugins -> dsh-mimo-speak
+        2. Paste a key, press Audition
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      description: Error codes shown in the UI are stable (`not-configured`, `timeout`, `upstream-error`, …) — quote them exactly.
+    validations:
+      required: true
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Which engine was in play?
+      options:
+        - MiMo (primary)
+        - Edge TTS fallback
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots of the card (with the key field blank), `dsh` console output with secrets removed.
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmations
+      options:
+        - label: I removed my API key and any personal paths from logs and screenshots.
+          required: true
+        - label: I searched the existing issues first.
+          required: true

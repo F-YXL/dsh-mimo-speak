@@ -8,7 +8,7 @@
  * error otherwise. The CLI tracks Microsoft's changes upstream.
  * @module dsh-mimo-speak/edge-tts
  */
-/** Resolve an Edge voice, defaulting to the user's preferred Xiaoxiao. */
+/** Resolve an Edge voice, defaulting to {@link DEFAULT_EDGE_VOICE}. */
 export declare function resolveEdgeVoice(voice: string | undefined): string;
 /**
  * Synthesize one text with Edge TTS.

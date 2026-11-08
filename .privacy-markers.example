@@ -1,0 +1,15 @@
+# `.privacy-markers` — your own names, handles and hostnames.
+#
+# This file is git-ignored on purpose: `scripts/check-privacy.mjs` reads it,
+# but the list itself never reaches the public repository. Without it the
+# scanner still checks credentials, e-mail addresses and home paths.
+#
+# One entry per line, `#` starts a comment:
+#
+#   keyword       matched with word boundaries, case-insensitive — handles,
+#                 short names, initials. e.g. `jdoe`
+#   *substring    matched anywhere, case-insensitive — hostnames, account ids,
+#                 anything that appears glued to other text. e.g. `*my-laptop`
+#
+# Add your GitHub handle, your real name, your machine's hostname and any
+# private project prefix you use. Then run: npm run check:privacy -- --verbose
