@@ -7,8 +7,9 @@
  * chunks keep arriving. Seek is not supported (the stream is transient), so
  * this player exposes the same `AudioPlayerState` surface minus seeking.
  *
- * A module-local registry of pause callbacks mirrors `use-audio-queue.ts`, so
- * starting one player pauses any other audio this plugin owns.
+ * All scheduling and the dispose guard live in `stream-dispose.ts`; this hook
+ * only binds that sink to React state, the shared audio bus and the browser's
+ * timers, so the sink runs (and is tested) without React or a DOM.
  * @module dsh-mimo-speak/client/use-stream-player
  */
 import type { AudioPlayerState } from './use-audio-queue.ts';

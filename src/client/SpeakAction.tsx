@@ -286,6 +286,30 @@ export function SpeakAction(props: SpeakActionProps) {
    */
   const abortRef = useRef<AbortController | null>(null)
 
+  // Page switches unmount every chat entry mid-read. Nothing else stops the
+  // in-flight run on unmount, so abort it, invalidate the session, and stop both
+  // engines; the stream player's own dispose guard then keeps any late SSE
+  // chunk from rebuilding its AudioContext. `playerClear`/`streamPlayer.clear`
+  // are reached through refs so an unmount-only effect never re-runs when a
+  // player identity changes. They may publish state in other call paths, but
+  // on unmount their hooks' own cleanups run first and make them no-op.
+  const streamClearRef = useRef<() => void>(() => {})
+  streamClearRef.current = streamPlayer.clear
+  const playerClearRef = useRef<() => void>(() => {})
+  playerClearRef.current = playerClear
+  useEffect(() => () => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    sessionRef.current += 1
+    playerClearRef.current()
+    streamClearRef.current()
+    highlighterRef.current?.clear()
+    highlighterRef.current = null
+    cuesRef.current = []
+    cueCursorRef.current = 0
+    keyOffsetRef.current = 0
+  }, [])
+
   // When the panel opens, flip it left when the speaker sits near the right
   // edge of the viewport, so the floating bar never overflows the window.
   useEffect(() => {

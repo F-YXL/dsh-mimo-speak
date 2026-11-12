@@ -107,7 +107,7 @@ If you find a vulnerability, use [SECURITY.md](./SECURITY.md), not a public issu
 ```sh
 npm install
 npm run build            # tsc -> lib/node, tsdown -> lib/client.js
-npm test                 # 65 unit tests (node --test)
+npm test                 # 74 unit tests (node --test)
 node scripts/stub-e2e.mjs        # full HTTP round-trip against a local stub, no key needed
 MIMO_API_KEY=... node scripts/live-e2e.mjs   # one real request against the MiMo platform
 ```
@@ -266,7 +266,7 @@ dsh-mimo-speak/
 │   ├── wav.ts  normalize.ts# PCM→WAV 封装；Markdown→可朗读文本
 │   ├── settings.ts         # 两侧共享：命名空间/路由/默认值/线格式类型
 │   └── client/             # 浏览器半侧：两个 slot 席位、播放器、配置卡片
-├── tests/                  # 65 项单测（node --test）
+├── tests/                  # 74 项单测（node --test）
 └── scripts/
     ├── stub-e2e.mjs        # 本地桩服务端到端（无需真实密钥）
     ├── live-e2e.mjs        # 真实 MiMo API 端到端（需 MIMO_API_KEY）
@@ -277,7 +277,7 @@ dsh-mimo-speak/
 
 ```sh
 npm install
-npm test                          # 65 项单测
+npm test                          # 74 项单测
 npm run build                     # tsc + tsdown → lib/
 node scripts/stub-e2e.mjs         # 真实 HTTP 桩端到端（96,044 字节 WAV）
 npm run check:privacy             # 隐私扫描，必须 0 命中
